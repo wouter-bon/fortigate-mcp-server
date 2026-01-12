@@ -81,7 +81,11 @@ Tool categories map to FortiGate API endpoints:
 | `CertificateTools` | `cmdb/certificate/local`, `cmdb/certificate/ca`, `cmdb/certificate/remote`, `cmdb/certificate/crl` |
 | `FabricTools` | Security Fabric topology, HA cluster status, SDN connectors |
 | `ACMETools` | Let's Encrypt certificate automation via DNS-01 challenge |
+| `PacketCaptureTools` | `cmdb/system/sniffer`, `monitor/system/sniffer` - packet capture with tshark analysis |
 | `FortiManagerTools` | Central device/policy management (uses `FortiManagerTool` base class) |
+
+### Device Name Resolution
+The base class supports device name aliases via `DEVICE_NAME_MAP` in `tools/base.py`. Users can reference devices by friendly name (e.g., "NLFMFW1A") instead of device_id (e.g., "default"). Resolution is case-insensitive.
 
 ### Configuration
 Config is loaded from JSON file specified by `--config` flag or `FORTIGATE_MCP_CONFIG` env var.
@@ -133,8 +137,26 @@ Common CMDB paths used by this server:
 - `certificate/remote` - Remote certificates
 - `certificate/crl` - Certificate revocation lists
 - `system/csf` - Security Fabric configuration
+- `system/sniffer` - Packet capture profiles
+
+Monitor paths for packet capture:
+- `monitor/system/sniffer` - Capture status
+- `monitor/system/sniffer/start` - Start capture
+- `monitor/system/sniffer/stop` - Stop capture
+- `monitor/system/sniffer/download` - Download PCAP
+- `monitor/system/sniffer/clear` - Clear captured packets
 
 All requests include `?vdom={vdom}` query parameter.
+
+## Packet Capture
+
+The `capture_and_analyze` tool provides automated traffic capture with analysis:
+1. Creates capture profile with BPF-style filters (interface, src_ip, dst_ip, protocol, port)
+2. Runs capture for configurable duration (default: 2 minutes)
+3. Saves PCAP to temp file (e.g., `/tmp/fortigate_capture_1_xxx.pcap`)
+4. Analyzes with tshark if available (protocol hierarchy, IP/TCP conversations, endpoints)
+5. Falls back to basic PCAP header parsing if tshark not installed
+6. Cleans up capture profile after completion
 
 ## MCP Protocol Notes
 
