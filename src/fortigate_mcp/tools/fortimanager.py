@@ -400,6 +400,100 @@ class FortiManagerTools(FortiManagerTool):
         except Exception as e:
             return self._handle_error("get certificates", manager_id, e)
 
+    def get_all_certificates(
+        self,
+        manager_id: str,
+        adoms: Optional[str] = None,
+        filter_letsencrypt: bool = False
+    ) -> List[Content]:
+        """Get certificates from all managed devices.
+
+        Scans all devices across specified ADOMs and returns certificate information
+        with parsed metadata including issuer, expiry, and Let's Encrypt detection.
+
+        Args:
+            manager_id: Manager identifier
+            adoms: Comma-separated list of ADOMs to scan (default: all ADOMs)
+            filter_letsencrypt: Only return Let's Encrypt certificates
+
+        Returns:
+            List of Content objects with certificate report
+        """
+        try:
+            fmg = self._get_manager(manager_id)
+
+            # Parse ADOMs if provided
+            adom_list = None
+            if adoms:
+                adom_list = [a.strip() for a in adoms.split(",")]
+
+            result = fmg.get_all_certificates(
+                adoms=adom_list,
+                filter_letsencrypt=filter_letsencrypt,
+                include_default=False
+            )
+
+            # Format as readable report
+            lines = ["**Certificate Report**", ""]
+
+            # Summary
+            summary = result.get("summary", {})
+            lines.append("## Summary")
+            lines.append(f"- Total devices with certificates: {summary.get('total_devices', 0)}")
+            lines.append(f"- Total certificates: {summary.get('total_certificates', 0)}")
+            lines.append(f"- Let's Encrypt certificates: {summary.get('letsencrypt_certificates', 0)}")
+            lines.append(f"- Expired certificates: {summary.get('expired_certificates', 0)}")
+            lines.append(f"- Expiring within 30 days: {summary.get('expiring_soon', 0)}")
+            lines.append("")
+
+            # Device details
+            lines.append("## Certificates by Device")
+            lines.append("")
+
+            for device in result.get("devices", []):
+                device_name = device.get("device_name", "Unknown")
+                hostname = device.get("hostname", device_name)
+                adom = device.get("adom", "")
+                certs = device.get("certificates", [])
+
+                lines.append(f"### {hostname} ({device_name})")
+                lines.append(f"ADOM: {adom}")
+                lines.append("")
+
+                for cert in certs:
+                    name = cert.get("name", "")
+                    cn = cert.get("common_name", "")
+                    is_le = cert.get("is_letsencrypt", False)
+                    is_expired = cert.get("is_expired", False)
+                    days = cert.get("days_until_expiry")
+                    valid_to = cert.get("valid_to", "")
+                    issuer_o = cert.get("issuer_o", "")
+
+                    # Status indicator
+                    if is_expired:
+                        status = "EXPIRED"
+                    elif days is not None and days <= 30:
+                        status = f"EXPIRING ({days}d)"
+                    else:
+                        status = "OK"
+
+                    # Certificate type
+                    cert_type = "LE" if is_le else issuer_o[:10] if issuer_o else "Unknown"
+
+                    lines.append(f"- **{name}**")
+                    lines.append(f"  - CN: {cn}")
+                    lines.append(f"  - Type: {cert_type}")
+                    lines.append(f"  - Expires: {valid_to} [{status}]")
+
+                lines.append("")
+
+            if not result.get("devices"):
+                lines.append("No certificates found matching criteria.")
+
+            return [Content(type="text", text="\n".join(lines))]
+        except Exception as e:
+            return self._handle_error("get all certificates", manager_id, e)
+
     # Installation
     def install_policy(
         self,

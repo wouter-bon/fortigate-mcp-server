@@ -9,10 +9,20 @@ This module provides FortiManager JSON-RPC API integration:
 """
 import logging
 import time
+import base64
+from datetime import datetime
 from typing import Dict, Any, Optional, List
 import httpx
 import json
 from .logging import get_logger, log_api_call
+
+# Try to import cryptography for certificate parsing
+try:
+    from cryptography import x509
+    from cryptography.hazmat.primitives import serialization
+    CRYPTO_AVAILABLE = True
+except ImportError:
+    CRYPTO_AVAILABLE = False
 
 
 class FortiManagerAPIError(Exception):
@@ -247,6 +257,118 @@ class FortiManagerAPI:
             self.logger.error(f"Connection test failed: {e}")
             return False
 
+    @staticmethod
+    def _parse_certificate_pem(pem_data: str) -> Dict[str, Any]:
+        """Parse a PEM certificate and extract metadata.
+
+        Args:
+            pem_data: PEM-encoded certificate string
+
+        Returns:
+            Dictionary with certificate metadata
+        """
+        if not CRYPTO_AVAILABLE:
+            return {}
+
+        try:
+            # Handle certificate that may or may not have headers
+            if "-----BEGIN CERTIFICATE-----" not in pem_data:
+                pem_data = f"-----BEGIN CERTIFICATE-----\n{pem_data}\n-----END CERTIFICATE-----"
+
+            cert = x509.load_pem_x509_certificate(pem_data.encode())
+
+            # Extract issuer components
+            issuer_parts = []
+            for attr in cert.issuer:
+                issuer_parts.append(f"{attr.oid._name} = {attr.value}")
+            issuer_str = ", ".join(issuer_parts)
+
+            # Extract subject components
+            subject_parts = []
+            for attr in cert.subject:
+                subject_parts.append(f"{attr.oid._name} = {attr.value}")
+            subject_str = ", ".join(subject_parts)
+
+            # Get common name from subject
+            cn = None
+            for attr in cert.subject:
+                if attr.oid == x509.oid.NameOID.COMMON_NAME:
+                    cn = attr.value
+                    break
+
+            # Check if Let's Encrypt
+            issuer_cn = None
+            issuer_o = None
+            for attr in cert.issuer:
+                if attr.oid == x509.oid.NameOID.COMMON_NAME:
+                    issuer_cn = attr.value
+                if attr.oid == x509.oid.NameOID.ORGANIZATION_NAME:
+                    issuer_o = attr.value
+
+            is_letsencrypt = (
+                issuer_o == "Let's Encrypt" or
+                (issuer_cn and issuer_cn.startswith("R") and issuer_cn[1:].isdigit()) or  # R3, R10, R11, etc.
+                (issuer_cn and issuer_cn.startswith("E") and issuer_cn[1:].isdigit())  # E1, E2, etc.
+            )
+
+            # Use timezone-aware datetime
+            now_utc = datetime.now().astimezone().replace(tzinfo=None)
+            expiry = cert.not_valid_after_utc.replace(tzinfo=None)
+
+            return {
+                "issuer": issuer_str,
+                "issuer_cn": issuer_cn,
+                "issuer_o": issuer_o,
+                "subject": subject_str,
+                "common_name": cn,
+                "valid_from": cert.not_valid_before_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                "valid_to": cert.not_valid_after_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                "serial_number": format(cert.serial_number, 'x'),
+                "is_letsencrypt": is_letsencrypt,
+                "is_expired": now_utc > expiry,
+                "days_until_expiry": (expiry - now_utc).days
+            }
+        except Exception as e:
+            return {"parse_error": str(e)}
+
+    def _enrich_certificate_data(self, cert_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Enrich certificate data by parsing the PEM content.
+
+        Args:
+            cert_data: Raw certificate data from FortiManager
+
+        Returns:
+            Enriched certificate data with parsed metadata
+        """
+        pem_content = cert_data.get("certificate", "")
+        if pem_content:
+            parsed = self._parse_certificate_pem(pem_content)
+            if parsed and "parse_error" not in parsed:
+                # Add parsed info to _certinfo or create it
+                if "_certinfo" not in cert_data:
+                    cert_data["_certinfo"] = {}
+
+                # Update with parsed values if not already present or if N/A
+                certinfo = cert_data["_certinfo"]
+                if not certinfo.get("issuer") or certinfo.get("issuer") == "N/A":
+                    certinfo["issuer"] = parsed.get("issuer", "")
+                if not certinfo.get("subject") or certinfo.get("subject") == "N/A":
+                    certinfo["subject"] = parsed.get("subject", "")
+                if not certinfo.get("validto") or certinfo.get("validto") == "N/A":
+                    certinfo["validto"] = parsed.get("valid_to", "")
+                if not certinfo.get("validfrom") or certinfo.get("validfrom") == "N/A":
+                    certinfo["validfrom"] = parsed.get("valid_from", "")
+
+                # Add extra parsed fields
+                certinfo["is_letsencrypt"] = parsed.get("is_letsencrypt", False)
+                certinfo["is_expired"] = parsed.get("is_expired", False)
+                certinfo["days_until_expiry"] = parsed.get("days_until_expiry")
+                certinfo["common_name"] = parsed.get("common_name", "")
+                certinfo["issuer_cn"] = parsed.get("issuer_cn", "")
+                certinfo["issuer_o"] = parsed.get("issuer_o", "")
+
+        return cert_data
+
     # System endpoints
     def get_system_status(self) -> Dict[str, Any]:
         """Get FortiManager system status."""
@@ -385,18 +507,134 @@ class FortiManagerAPI:
         return self._make_request("get", params)
 
     # Certificate management
-    def get_certificates(self, device_name: str, adom: Optional[str] = None) -> Dict[str, Any]:
+    def get_certificates(
+        self,
+        device_name: str,
+        adom: Optional[str] = None,
+        enrich: bool = True
+    ) -> Dict[str, Any]:
         """Get certificates from a managed device.
 
         Args:
             device_name: Device name
             adom: Administrative Domain
+            enrich: Parse PEM data to fill in missing metadata (default True)
+
+        Returns:
+            Dictionary with certificate data, enriched with parsed metadata
         """
         adom = adom or self.adom
         params = [{
             "url": f"/pm/config/device/{device_name}/vdom/root/vpn/certificate/local"
         }]
-        return self._make_request("get", params)
+        result = self._make_request("get", params)
+
+        # Enrich certificate data by parsing PEM content
+        if enrich and "data" in result:
+            for cert in result["data"]:
+                self._enrich_certificate_data(cert)
+
+        return result
+
+    def get_all_certificates(
+        self,
+        adoms: Optional[List[str]] = None,
+        filter_letsencrypt: bool = False,
+        include_default: bool = False
+    ) -> Dict[str, Any]:
+        """Get certificates from all managed devices across ADOMs.
+
+        Args:
+            adoms: List of ADOMs to scan (default: all ADOMs with devices)
+            filter_letsencrypt: Only return Let's Encrypt certificates
+            include_default: Include default Fortinet certificates
+
+        Returns:
+            Dictionary with all certificates organized by device
+        """
+        results = {
+            "devices": [],
+            "summary": {
+                "total_devices": 0,
+                "total_certificates": 0,
+                "letsencrypt_certificates": 0,
+                "expired_certificates": 0,
+                "expiring_soon": 0  # Within 30 days
+            }
+        }
+
+        # Get ADOMs to scan
+        if adoms is None:
+            adom_result = self.get_adoms()
+            adoms = [a.get("name") for a in adom_result.get("data", [])]
+
+        # Scan each ADOM for devices
+        for adom in adoms:
+            try:
+                devices = self.get_devices(adom)
+                for device in devices.get("data", []):
+                    device_name = device.get("name")
+                    hostname = device.get("hostname", device_name)
+
+                    try:
+                        certs = self.get_certificates(device_name, adom, enrich=True)
+                        cert_list = certs.get("data", [])
+
+                        device_certs = []
+                        for cert in cert_list:
+                            cert_name = cert.get("name", "")
+
+                            # Skip default Fortinet certs unless requested
+                            if not include_default and cert_name.startswith("Fortinet_"):
+                                continue
+
+                            certinfo = cert.get("_certinfo", {})
+                            is_le = certinfo.get("is_letsencrypt", False)
+
+                            # Apply Let's Encrypt filter if requested
+                            if filter_letsencrypt and not is_le:
+                                continue
+
+                            cert_entry = {
+                                "name": cert_name,
+                                "common_name": certinfo.get("common_name", ""),
+                                "issuer": certinfo.get("issuer", ""),
+                                "issuer_cn": certinfo.get("issuer_cn", ""),
+                                "issuer_o": certinfo.get("issuer_o", ""),
+                                "valid_from": certinfo.get("validfrom", ""),
+                                "valid_to": certinfo.get("validto", ""),
+                                "is_letsencrypt": is_le,
+                                "is_expired": certinfo.get("is_expired", False),
+                                "days_until_expiry": certinfo.get("days_until_expiry")
+                            }
+                            device_certs.append(cert_entry)
+
+                            # Update summary
+                            results["summary"]["total_certificates"] += 1
+                            if is_le:
+                                results["summary"]["letsencrypt_certificates"] += 1
+                            if certinfo.get("is_expired"):
+                                results["summary"]["expired_certificates"] += 1
+                            days = certinfo.get("days_until_expiry")
+                            if days is not None and 0 < days <= 30:
+                                results["summary"]["expiring_soon"] += 1
+
+                        if device_certs:
+                            results["devices"].append({
+                                "device_name": device_name,
+                                "hostname": hostname,
+                                "adom": adom,
+                                "certificates": device_certs
+                            })
+                            results["summary"]["total_devices"] += 1
+
+                    except Exception as e:
+                        self.logger.warning(f"Failed to get certs for {device_name}: {e}")
+
+            except Exception as e:
+                self.logger.warning(f"Failed to get devices for ADOM {adom}: {e}")
+
+        return results
 
     # Task management
     def get_task_status(self, task_id: int) -> Dict[str, Any]:
