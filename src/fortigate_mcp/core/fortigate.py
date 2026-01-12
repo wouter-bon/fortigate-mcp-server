@@ -288,6 +288,51 @@ class FortiGateAPI:
         """Get detailed information for a specific virtual IP."""
         return self._make_request("GET", f"cmdb/firewall/vip/{vip_name}", vdom=vdom)
 
+    # Certificate endpoints
+    def get_local_certificates(self, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get local (device) certificates."""
+        return self._make_request("GET", "cmdb/certificate/local", vdom=vdom)
+
+    def get_local_certificate_detail(self, cert_name: str, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get detailed information for a specific local certificate."""
+        return self._make_request("GET", f"cmdb/certificate/local/{cert_name}", vdom=vdom)
+
+    def get_ca_certificates(self, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get CA certificates."""
+        return self._make_request("GET", "cmdb/certificate/ca", vdom=vdom)
+
+    def get_ca_certificate_detail(self, cert_name: str, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get detailed information for a specific CA certificate."""
+        return self._make_request("GET", f"cmdb/certificate/ca/{cert_name}", vdom=vdom)
+
+    def get_remote_certificates(self, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get remote certificates."""
+        return self._make_request("GET", "cmdb/certificate/remote", vdom=vdom)
+
+    def get_remote_certificate_detail(self, cert_name: str, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get detailed information for a specific remote certificate."""
+        return self._make_request("GET", f"cmdb/certificate/remote/{cert_name}", vdom=vdom)
+
+    def get_crl(self, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get certificate revocation lists."""
+        return self._make_request("GET", "cmdb/certificate/crl", vdom=vdom)
+
+    def get_crl_detail(self, crl_name: str, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get detailed information for a specific CRL."""
+        return self._make_request("GET", f"cmdb/certificate/crl/{crl_name}", vdom=vdom)
+
+    def delete_local_certificate(self, cert_name: str, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Delete a local certificate."""
+        return self._make_request("DELETE", f"cmdb/certificate/local/{cert_name}", vdom=vdom)
+
+    def delete_ca_certificate(self, cert_name: str, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Delete a CA certificate."""
+        return self._make_request("DELETE", f"cmdb/certificate/ca/{cert_name}", vdom=vdom)
+
+    def delete_remote_certificate(self, cert_name: str, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Delete a remote certificate."""
+        return self._make_request("DELETE", f"cmdb/certificate/remote/{cert_name}", vdom=vdom)
+
 
 class FortiGateManager:
     """Manager for multiple FortiGate devices.

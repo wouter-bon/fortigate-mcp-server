@@ -33,6 +33,7 @@ from .tools.firewall import FirewallTools
 from .tools.network import NetworkTools
 from .tools.routing import RoutingTools
 from .tools.virtual_ip import VirtualIPTools
+from .tools.certificate import CertificateTools
 from .tools.definitions import *
 
 class FortiGateMCPServer:
@@ -60,6 +61,7 @@ class FortiGateMCPServer:
         self.network_tools = NetworkTools(self.fortigate_manager)
         self.routing_tools = RoutingTools(self.fortigate_manager)
         self.virtual_ip_tools = VirtualIPTools(self.fortigate_manager)
+        self.certificate_tools = CertificateTools(self.fortigate_manager)
         
         # Initialize MCP server
         self.mcp = FastMCP("FortiGateMCP")
@@ -299,6 +301,91 @@ class FortiGateMCPServer:
         ):
             return await self.virtual_ip_tools.delete_virtual_ip(device_id, name, vdom)
 
+        # Certificate tools
+        @self.mcp.tool(description=LIST_LOCAL_CERTIFICATES_DESC)
+        async def list_local_certificates(
+            device_id: Annotated[str, Field(description="FortiGate device identifier")],
+            vdom: Annotated[Optional[str], Field(description="Virtual Domain", default=None)] = None
+        ):
+            return self.certificate_tools.list_local_certificates(device_id, vdom)
+
+        @self.mcp.tool(description=LIST_CA_CERTIFICATES_DESC)
+        async def list_ca_certificates(
+            device_id: Annotated[str, Field(description="FortiGate device identifier")],
+            vdom: Annotated[Optional[str], Field(description="Virtual Domain", default=None)] = None
+        ):
+            return self.certificate_tools.list_ca_certificates(device_id, vdom)
+
+        @self.mcp.tool(description=LIST_REMOTE_CERTIFICATES_DESC)
+        async def list_remote_certificates(
+            device_id: Annotated[str, Field(description="FortiGate device identifier")],
+            vdom: Annotated[Optional[str], Field(description="Virtual Domain", default=None)] = None
+        ):
+            return self.certificate_tools.list_remote_certificates(device_id, vdom)
+
+        @self.mcp.tool(description=GET_LOCAL_CERTIFICATE_DETAIL_DESC)
+        async def get_local_certificate_detail(
+            device_id: Annotated[str, Field(description="FortiGate device identifier")],
+            cert_name: Annotated[str, Field(description="Certificate name")],
+            vdom: Annotated[Optional[str], Field(description="Virtual Domain", default=None)] = None
+        ):
+            return self.certificate_tools.get_local_certificate_detail(device_id, cert_name, vdom)
+
+        @self.mcp.tool(description=GET_CA_CERTIFICATE_DETAIL_DESC)
+        async def get_ca_certificate_detail(
+            device_id: Annotated[str, Field(description="FortiGate device identifier")],
+            cert_name: Annotated[str, Field(description="CA certificate name")],
+            vdom: Annotated[Optional[str], Field(description="Virtual Domain", default=None)] = None
+        ):
+            return self.certificate_tools.get_ca_certificate_detail(device_id, cert_name, vdom)
+
+        @self.mcp.tool(description=GET_REMOTE_CERTIFICATE_DETAIL_DESC)
+        async def get_remote_certificate_detail(
+            device_id: Annotated[str, Field(description="FortiGate device identifier")],
+            cert_name: Annotated[str, Field(description="Remote certificate name")],
+            vdom: Annotated[Optional[str], Field(description="Virtual Domain", default=None)] = None
+        ):
+            return self.certificate_tools.get_remote_certificate_detail(device_id, cert_name, vdom)
+
+        @self.mcp.tool(description=LIST_CRL_DESC)
+        async def list_crl(
+            device_id: Annotated[str, Field(description="FortiGate device identifier")],
+            vdom: Annotated[Optional[str], Field(description="Virtual Domain", default=None)] = None
+        ):
+            return self.certificate_tools.list_crl(device_id, vdom)
+
+        @self.mcp.tool(description=GET_CRL_DETAIL_DESC)
+        async def get_crl_detail(
+            device_id: Annotated[str, Field(description="FortiGate device identifier")],
+            crl_name: Annotated[str, Field(description="CRL name")],
+            vdom: Annotated[Optional[str], Field(description="Virtual Domain", default=None)] = None
+        ):
+            return self.certificate_tools.get_crl_detail(device_id, crl_name, vdom)
+
+        @self.mcp.tool(description=DELETE_LOCAL_CERTIFICATE_DESC)
+        async def delete_local_certificate(
+            device_id: Annotated[str, Field(description="FortiGate device identifier")],
+            cert_name: Annotated[str, Field(description="Certificate name to delete")],
+            vdom: Annotated[Optional[str], Field(description="Virtual Domain", default=None)] = None
+        ):
+            return self.certificate_tools.delete_local_certificate(device_id, cert_name, vdom)
+
+        @self.mcp.tool(description=DELETE_CA_CERTIFICATE_DESC)
+        async def delete_ca_certificate(
+            device_id: Annotated[str, Field(description="FortiGate device identifier")],
+            cert_name: Annotated[str, Field(description="CA certificate name to delete")],
+            vdom: Annotated[Optional[str], Field(description="Virtual Domain", default=None)] = None
+        ):
+            return self.certificate_tools.delete_ca_certificate(device_id, cert_name, vdom)
+
+        @self.mcp.tool(description=DELETE_REMOTE_CERTIFICATE_DESC)
+        async def delete_remote_certificate(
+            device_id: Annotated[str, Field(description="FortiGate device identifier")],
+            cert_name: Annotated[str, Field(description="Remote certificate name to delete")],
+            vdom: Annotated[Optional[str], Field(description="Virtual Domain", default=None)] = None
+        ):
+            return self.certificate_tools.delete_remote_certificate(device_id, cert_name, vdom)
+
         # System tools
         @self.mcp.tool(description=HEALTH_CHECK_DESC)
         async def health_check():
@@ -321,9 +408,11 @@ class FortiGateMCPServer:
                 "registered_devices": len(self.fortigate_manager.devices),
                 "available_tools": [
                     "Device Management (6 tools)",
-                    "Firewall Policy Management (4 tools)",
+                    "Firewall Policy Management (5 tools)",
                     "Network Objects Management (4 tools)",
-                    "Routing Management (4 tools)",
+                    "Routing Management (8 tools)",
+                    "Virtual IP Management (5 tools)",
+                    "Certificate Management (11 tools)",
                     "System Tools (2 tools)"
                 ]
             }

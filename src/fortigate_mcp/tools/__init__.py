@@ -6,12 +6,14 @@ from .firewall import FirewallTools
 from .network import NetworkTools
 from .routing import RoutingTools
 from .virtual_ip import VirtualIPTools
+from .certificate import CertificateTools
 
 __all__ = [
     "FortiGateTool",
     "DeviceTools",
-    "FirewallTools", 
+    "FirewallTools",
     "NetworkTools",
     "RoutingTools",
-    "VirtualIPTools"
+    "VirtualIPTools",
+    "CertificateTools"
 ]

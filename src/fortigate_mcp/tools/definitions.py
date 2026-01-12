@@ -603,3 +603,189 @@ Returns:
 - Runtime statistics
 - API endpoints
 """
+
+# Certificate Tool Descriptions
+LIST_LOCAL_CERTIFICATES_DESC = """
+List all local (device) certificates on a FortiGate device.
+
+This tool retrieves all locally installed certificates on the device,
+including SSL certificates, VPN certificates, and other device certificates.
+
+Parameters:
+- device_id: Identifier of the FortiGate device
+- vdom: Virtual Domain name (optional, uses device default)
+
+Returns:
+- Certificate name and type
+- Subject and issuer information
+- Validity period (start and end dates)
+- Certificate status
+"""
+
+LIST_CA_CERTIFICATES_DESC = """
+List all CA (Certificate Authority) certificates on a FortiGate device.
+
+This tool retrieves all trusted CA certificates installed on the device,
+used for validating SSL/TLS connections and VPN authentication.
+
+Parameters:
+- device_id: Identifier of the FortiGate device
+- vdom: Virtual Domain name (optional, uses device default)
+
+Returns:
+- CA certificate name
+- Subject and issuer information
+- Validity period
+- Trust status
+"""
+
+LIST_REMOTE_CERTIFICATES_DESC = """
+List all remote certificates on a FortiGate device.
+
+This tool retrieves certificates obtained from remote peers,
+typically used in VPN and SSL inspection scenarios.
+
+Parameters:
+- device_id: Identifier of the FortiGate device
+- vdom: Virtual Domain name (optional, uses device default)
+
+Returns:
+- Remote certificate name
+- Subject and issuer information
+- Source information
+- Certificate status
+"""
+
+GET_LOCAL_CERTIFICATE_DETAIL_DESC = """
+Get detailed information for a specific local certificate.
+
+This tool retrieves comprehensive details about a locally installed
+certificate, including its full certificate chain and usage information.
+
+Parameters:
+- device_id: Identifier of the FortiGate device
+- cert_name: Name of the certificate to query
+- vdom: Virtual Domain name (optional, uses device default)
+
+Returns:
+- Complete certificate details
+- Public key information
+- Signature algorithm
+- Certificate chain
+- Usage and constraints
+"""
+
+GET_CA_CERTIFICATE_DETAIL_DESC = """
+Get detailed information for a specific CA certificate.
+
+This tool retrieves comprehensive details about a CA certificate,
+including trust settings and validation parameters.
+
+Parameters:
+- device_id: Identifier of the FortiGate device
+- cert_name: Name of the CA certificate to query
+- vdom: Virtual Domain name (optional, uses device default)
+
+Returns:
+- Complete CA certificate details
+- Trust chain information
+- Validation settings
+- Associated services
+"""
+
+GET_REMOTE_CERTIFICATE_DETAIL_DESC = """
+Get detailed information for a specific remote certificate.
+
+This tool retrieves comprehensive details about a remote certificate,
+including peer information and validation status.
+
+Parameters:
+- device_id: Identifier of the FortiGate device
+- cert_name: Name of the remote certificate to query
+- vdom: Virtual Domain name (optional, uses device default)
+
+Returns:
+- Complete remote certificate details
+- Peer information
+- Validation status
+- Last update time
+"""
+
+LIST_CRL_DESC = """
+List all Certificate Revocation Lists (CRLs) on a FortiGate device.
+
+This tool retrieves all configured CRLs used for checking
+certificate revocation status.
+
+Parameters:
+- device_id: Identifier of the FortiGate device
+- vdom: Virtual Domain name (optional, uses device default)
+
+Returns:
+- CRL name and source
+- Last update time
+- Next update time
+- Number of revoked certificates
+"""
+
+GET_CRL_DETAIL_DESC = """
+Get detailed information for a specific Certificate Revocation List.
+
+This tool retrieves comprehensive details about a CRL,
+including its update schedule and revocation entries.
+
+Parameters:
+- device_id: Identifier of the FortiGate device
+- crl_name: Name of the CRL to query
+- vdom: Virtual Domain name (optional, uses device default)
+
+Returns:
+- Complete CRL details
+- Distribution point information
+- Update schedule
+- Revocation entries count
+"""
+
+DELETE_LOCAL_CERTIFICATE_DESC = """
+Delete a local certificate from a FortiGate device.
+
+This tool removes a locally installed certificate from the device.
+Note that certificates in use by services cannot be deleted.
+
+Parameters:
+- device_id: Identifier of the FortiGate device
+- cert_name: Name of the certificate to delete
+- vdom: Virtual Domain name (optional, uses device default)
+
+Returns:
+- Deletion status confirmation
+"""
+
+DELETE_CA_CERTIFICATE_DESC = """
+Delete a CA certificate from a FortiGate device.
+
+This tool removes a CA certificate from the device's trusted store.
+Note that CA certificates in use for validation cannot be deleted.
+
+Parameters:
+- device_id: Identifier of the FortiGate device
+- cert_name: Name of the CA certificate to delete
+- vdom: Virtual Domain name (optional, uses device default)
+
+Returns:
+- Deletion status confirmation
+"""
+
+DELETE_REMOTE_CERTIFICATE_DESC = """
+Delete a remote certificate from a FortiGate device.
+
+This tool removes a remote certificate from the device.
+
+Parameters:
+- device_id: Identifier of the FortiGate device
+- cert_name: Name of the remote certificate to delete
+- vdom: Virtual Domain name (optional, uses device default)
+
+Returns:
+- Deletion status confirmation
+"""

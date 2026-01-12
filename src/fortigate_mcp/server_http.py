@@ -31,6 +31,7 @@ from .tools.firewall import FirewallTools
 from .tools.network import NetworkTools
 from .tools.routing import RoutingTools
 from .tools.virtual_ip import VirtualIPTools
+from .tools.certificate import CertificateTools
 
 logger = logging.getLogger("fortigate-mcp.http")
 
@@ -87,6 +88,7 @@ class FortiGateMCPHTTPServer:
         self.network_tools = NetworkTools(self.fortigate_manager)
         self.routing_tools = RoutingTools(self.fortigate_manager)
         self.virtual_ip_tools = VirtualIPTools(self.fortigate_manager)
+        self.certificate_tools = CertificateTools(self.fortigate_manager)
         
         # Initialize FastMCP
         self.mcp = FastMCP("FortiGateMCP-HTTP")
@@ -244,6 +246,51 @@ class FortiGateMCPHTTPServer:
         def delete_virtual_ip(device_id: str, name: str, vdom: Optional[str] = None):
             return self.virtual_ip_tools.delete_virtual_ip(device_id, name, vdom)
 
+        # Certificate tools
+        @self.mcp.tool(description="List local (device) certificates")
+        def list_local_certificates(device_id: str, vdom: Optional[str] = None):
+            return self.certificate_tools.list_local_certificates(device_id, vdom)
+
+        @self.mcp.tool(description="List CA certificates")
+        def list_ca_certificates(device_id: str, vdom: Optional[str] = None):
+            return self.certificate_tools.list_ca_certificates(device_id, vdom)
+
+        @self.mcp.tool(description="List remote certificates")
+        def list_remote_certificates(device_id: str, vdom: Optional[str] = None):
+            return self.certificate_tools.list_remote_certificates(device_id, vdom)
+
+        @self.mcp.tool(description="Get local certificate detail")
+        def get_local_certificate_detail(device_id: str, cert_name: str, vdom: Optional[str] = None):
+            return self.certificate_tools.get_local_certificate_detail(device_id, cert_name, vdom)
+
+        @self.mcp.tool(description="Get CA certificate detail")
+        def get_ca_certificate_detail(device_id: str, cert_name: str, vdom: Optional[str] = None):
+            return self.certificate_tools.get_ca_certificate_detail(device_id, cert_name, vdom)
+
+        @self.mcp.tool(description="Get remote certificate detail")
+        def get_remote_certificate_detail(device_id: str, cert_name: str, vdom: Optional[str] = None):
+            return self.certificate_tools.get_remote_certificate_detail(device_id, cert_name, vdom)
+
+        @self.mcp.tool(description="List certificate revocation lists (CRLs)")
+        def list_crl(device_id: str, vdom: Optional[str] = None):
+            return self.certificate_tools.list_crl(device_id, vdom)
+
+        @self.mcp.tool(description="Get CRL detail")
+        def get_crl_detail(device_id: str, crl_name: str, vdom: Optional[str] = None):
+            return self.certificate_tools.get_crl_detail(device_id, crl_name, vdom)
+
+        @self.mcp.tool(description="Delete local certificate")
+        def delete_local_certificate(device_id: str, cert_name: str, vdom: Optional[str] = None):
+            return self.certificate_tools.delete_local_certificate(device_id, cert_name, vdom)
+
+        @self.mcp.tool(description="Delete CA certificate")
+        def delete_ca_certificate(device_id: str, cert_name: str, vdom: Optional[str] = None):
+            return self.certificate_tools.delete_ca_certificate(device_id, cert_name, vdom)
+
+        @self.mcp.tool(description="Delete remote certificate")
+        def delete_remote_certificate(device_id: str, cert_name: str, vdom: Optional[str] = None):
+            return self.certificate_tools.delete_remote_certificate(device_id, cert_name, vdom)
+
         # System tools
         @self.mcp.tool(description="Test FortiGate connection")
         def test_connection():
@@ -314,7 +361,8 @@ class FortiGateMCPHTTPServer:
                     "firewall_tools": self.firewall_tools.get_schema_info(),
                     "network_tools": self.network_tools.get_schema_info(),
                     "routing_tools": self.routing_tools.get_schema_info(),
-                    "virtual_ip_tools": self.virtual_ip_tools.get_schema_info()
+                    "virtual_ip_tools": self.virtual_ip_tools.get_schema_info(),
+                    "certificate_tools": self.certificate_tools.get_schema_info()
                 }
             }
             return self._format_response(schema_info, "get_schema_info")
