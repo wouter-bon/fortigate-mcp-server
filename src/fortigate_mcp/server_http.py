@@ -26,6 +26,7 @@ except ImportError:
 from .config.loader import load_config
 from .core.logging import setup_logging
 from .core.fortigate import FortiGateManager
+from .core.fortimanager import FortiManagerManager
 from .tools.device import DeviceTools
 from .tools.firewall import FirewallTools
 from .tools.network import NetworkTools
@@ -34,6 +35,7 @@ from .tools.virtual_ip import VirtualIPTools
 from .tools.certificate import CertificateTools
 from .tools.acme import ACMETools
 from .tools.fabric import FabricTools
+from .tools.fortimanager import FortiManagerTools
 
 logger = logging.getLogger("fortigate-mcp.http")
 
@@ -109,7 +111,11 @@ class FortiGateMCPHTTPServer:
         }
         self.acme_tools = ACMETools(self.fortigate_manager, acme_config)
         self.fabric_tools = FabricTools(self.fortigate_manager)
-        
+
+        # Initialize FortiManager
+        self.fmg_manager = FortiManagerManager()
+        self.fmg_tools = FortiManagerTools(self.fmg_manager)
+
         # Initialize FastMCP
         self.mcp = FastMCP("FortiGateMCP-HTTP")
         
@@ -401,6 +407,92 @@ class FortiGateMCPHTTPServer:
         def get_fabric_topology(device_id: str, vdom: Optional[str] = None):
             return self.fabric_tools.get_fabric_topology(device_id, vdom)
 
+        # FortiManager tools
+        @self.mcp.tool(description="List registered FortiManager instances")
+        def fmg_list_managers():
+            return self.fmg_tools.list_managers()
+
+        @self.mcp.tool(description="Add a FortiManager instance")
+        def fmg_add_manager(
+            manager_id: str,
+            host: str,
+            api_token: Optional[str] = None,
+            username: Optional[str] = None,
+            password: Optional[str] = None,
+            port: int = 443,
+            verify_ssl: bool = False,
+            adom: str = "root"
+        ):
+            return self.fmg_tools.add_manager(
+                manager_id, host, api_token, username, password, port, verify_ssl, adom
+            )
+
+        @self.mcp.tool(description="Remove a FortiManager instance")
+        def fmg_remove_manager(manager_id: str):
+            return self.fmg_tools.remove_manager(manager_id)
+
+        @self.mcp.tool(description="Test FortiManager connection")
+        def fmg_test_connection(manager_id: str):
+            return self.fmg_tools.test_connection(manager_id)
+
+        @self.mcp.tool(description="Get FortiManager system status")
+        def fmg_get_system_status(manager_id: str):
+            return self.fmg_tools.get_system_status(manager_id)
+
+        @self.mcp.tool(description="Get FortiManager Administrative Domains (ADOMs)")
+        def fmg_get_adoms(manager_id: str):
+            return self.fmg_tools.get_adoms(manager_id)
+
+        @self.mcp.tool(description="Get managed devices from FortiManager")
+        def fmg_get_devices(manager_id: str, adom: Optional[str] = None):
+            return self.fmg_tools.get_devices(manager_id, adom)
+
+        @self.mcp.tool(description="Get device status from FortiManager")
+        def fmg_get_device_status(manager_id: str, device_name: str, adom: Optional[str] = None):
+            return self.fmg_tools.get_device_status(manager_id, device_name, adom)
+
+        @self.mcp.tool(description="Get all managed devices status from FortiManager")
+        def fmg_get_all_devices_status(manager_id: str, adom: Optional[str] = None):
+            return self.fmg_tools.get_all_devices_status(manager_id, adom)
+
+        @self.mcp.tool(description="Get policy packages from FortiManager")
+        def fmg_get_policy_packages(manager_id: str, adom: Optional[str] = None):
+            return self.fmg_tools.get_policy_packages(manager_id, adom)
+
+        @self.mcp.tool(description="Get firewall policies from FortiManager policy package")
+        def fmg_get_firewall_policies(manager_id: str, pkg_name: str, adom: Optional[str] = None):
+            return self.fmg_tools.get_firewall_policies(manager_id, pkg_name, adom)
+
+        @self.mcp.tool(description="Get address objects from FortiManager")
+        def fmg_get_address_objects(manager_id: str, adom: Optional[str] = None):
+            return self.fmg_tools.get_address_objects(manager_id, adom)
+
+        @self.mcp.tool(description="Get service objects from FortiManager")
+        def fmg_get_service_objects(manager_id: str, adom: Optional[str] = None):
+            return self.fmg_tools.get_service_objects(manager_id, adom)
+
+        @self.mcp.tool(description="Get certificates from managed device via FortiManager")
+        def fmg_get_device_certificates(manager_id: str, device_name: str, adom: Optional[str] = None):
+            return self.fmg_tools.get_device_certificates(manager_id, device_name, adom)
+
+        @self.mcp.tool(description="Install policy package to device via FortiManager")
+        def fmg_install_policy(
+            manager_id: str,
+            pkg_name: str,
+            device_name: str,
+            adom: Optional[str] = None,
+            vdom: str = "root"
+        ):
+            return self.fmg_tools.install_policy(manager_id, pkg_name, device_name, adom, vdom)
+
+        @self.mcp.tool(description="Get policy installation status from FortiManager")
+        def fmg_get_install_status(manager_id: str, adom: Optional[str] = None):
+            return self.fmg_tools.get_install_status(manager_id, adom)
+
+        @self.mcp.tool(description="Get task status from FortiManager")
+        def fmg_get_task_status(manager_id: str, task_id: int):
+            return self.fmg_tools.get_task_status(manager_id, task_id)
+
         # System tools
         @self.mcp.tool(description="Test FortiGate connection")
         def test_connection():
@@ -474,7 +566,12 @@ class FortiGateMCPHTTPServer:
                     "virtual_ip_tools": self.virtual_ip_tools.get_schema_info(),
                     "certificate_tools": self.certificate_tools.get_schema_info(),
                     "acme_tools": self.acme_tools.get_schema_info(),
-                    "fabric_tools": self.fabric_tools.get_schema_info()
+                    "fabric_tools": self.fabric_tools.get_schema_info(),
+                    "fortimanager_tools": {
+                        "name": "fortimanager_tools",
+                        "description": "FortiManager centralized management tools",
+                        "managers": self.fmg_manager.list_managers()
+                    }
                 }
             }
             return self._format_response(schema_info, "get_schema_info")
