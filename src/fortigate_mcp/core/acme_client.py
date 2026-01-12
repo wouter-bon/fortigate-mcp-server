@@ -2,7 +2,7 @@
 import os
 import time
 from typing import Optional, Tuple, Callable
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
@@ -103,6 +103,8 @@ class ACMEClient:
 
         self.logger.info(f"Registering ACME account for {self.email}")
 
+        from acme import errors as acme_errors
+
         try:
             # Try to create new registration
             registration = acme_client.new_account(
@@ -112,9 +114,15 @@ class ACMEClient:
                 )
             )
             self.logger.info("Created new ACME account")
-        except Exception as e:
-            # Account might already exist
-            self.logger.info(f"Account may already exist: {e}")
+        except acme_errors.ConflictError as e:
+            # Account already exists - use only_return_existing
+            self.logger.info(f"Account already exists at {e}, retrieving...")
+            # Set the account URI on the network client
+            acme_client.net.account = messages.RegistrationResource(
+                uri=str(e),
+                body=messages.Registration()
+            )
+            # Query with only_return_existing
             registration = acme_client.new_account(
                 messages.NewRegistration.from_data(
                     email=self.email,
@@ -123,6 +131,9 @@ class ACMEClient:
                 )
             )
             self.logger.info("Retrieved existing ACME account")
+        except Exception as e:
+            self.logger.error(f"Account registration failed: {e}")
+            raise
 
         self._registration = registration
         return registration
@@ -222,7 +233,6 @@ class ACMEClient:
         private_key_pem, csr_pem = self.generate_csr(domains, key_type, key_size)
 
         # Request new order
-        csr = crypto_util.load_pem_private_key(private_key_pem)
         order = acme_client.new_order(csr_pem)
 
         self.logger.info(f"Created order with {len(order.authorizations)} authorizations")
@@ -265,7 +275,12 @@ class ACMEClient:
                 # Wait for validation
                 start_time = time.time()
                 while time.time() - start_time < timeout:
-                    authz_resource = acme_client.poll(authz)
+                    poll_result = acme_client.poll(authz)
+                    # Handle both old (single) and new (tuple) return formats
+                    if isinstance(poll_result, tuple):
+                        authz_resource = poll_result[0]
+                    else:
+                        authz_resource = poll_result
                     if authz_resource.body.status == messages.STATUS_VALID:
                         self.logger.info(f"Authorization valid for {domain}")
                         break
@@ -318,5 +333,5 @@ class ACMEClient:
             "not_valid_before": cert.not_valid_before_utc.isoformat(),
             "not_valid_after": cert.not_valid_after_utc.isoformat(),
             "domains": sans,
-            "days_remaining": (cert.not_valid_after_utc - datetime.utcnow()).days
+            "days_remaining": (cert.not_valid_after_utc - datetime.now(timezone.utc)).days
         }
