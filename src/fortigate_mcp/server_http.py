@@ -33,6 +33,7 @@ from .tools.routing import RoutingTools
 from .tools.virtual_ip import VirtualIPTools
 from .tools.certificate import CertificateTools
 from .tools.acme import ACMETools
+from .tools.fabric import FabricTools
 
 logger = logging.getLogger("fortigate-mcp.http")
 
@@ -107,6 +108,7 @@ class FortiGateMCPHTTPServer:
             )
         }
         self.acme_tools = ACMETools(self.fortigate_manager, acme_config)
+        self.fabric_tools = FabricTools(self.fortigate_manager)
         
         # Initialize FastMCP
         self.mcp = FastMCP("FortiGateMCP-HTTP")
@@ -370,6 +372,35 @@ class FortiGateMCPHTTPServer:
         def verify_cloudflare_token(cloudflare_api_token: Optional[str] = None):
             return self.acme_tools.verify_cloudflare_token(cloudflare_api_token)
 
+        # Security Fabric tools
+        @self.mcp.tool(description="Get Security Fabric configuration")
+        def get_security_fabric_config(device_id: str, vdom: Optional[str] = None):
+            return self.fabric_tools.get_security_fabric_config(device_id, vdom)
+
+        @self.mcp.tool(description="Get Security Fabric runtime status and topology")
+        def get_security_fabric_status(device_id: str, vdom: Optional[str] = None):
+            return self.fabric_tools.get_security_fabric_status(device_id, vdom)
+
+        @self.mcp.tool(description="Get list of Security Fabric devices")
+        def get_fabric_devices(device_id: str, vdom: Optional[str] = None):
+            return self.fabric_tools.get_fabric_devices(device_id, vdom)
+
+        @self.mcp.tool(description="Get SDN/cloud fabric connectors")
+        def get_fabric_connectors(device_id: str, vdom: Optional[str] = None):
+            return self.fabric_tools.get_fabric_connectors(device_id, vdom)
+
+        @self.mcp.tool(description="Get High Availability (HA) cluster status")
+        def get_ha_status(device_id: str, vdom: Optional[str] = None):
+            return self.fabric_tools.get_ha_status(device_id, vdom)
+
+        @self.mcp.tool(description="Get High Availability (HA) configuration")
+        def get_ha_config(device_id: str, vdom: Optional[str] = None):
+            return self.fabric_tools.get_ha_config(device_id, vdom)
+
+        @self.mcp.tool(description="Get comprehensive Security Fabric topology including all fabric members")
+        def get_fabric_topology(device_id: str, vdom: Optional[str] = None):
+            return self.fabric_tools.get_fabric_topology(device_id, vdom)
+
         # System tools
         @self.mcp.tool(description="Test FortiGate connection")
         def test_connection():
@@ -442,7 +473,8 @@ class FortiGateMCPHTTPServer:
                     "routing_tools": self.routing_tools.get_schema_info(),
                     "virtual_ip_tools": self.virtual_ip_tools.get_schema_info(),
                     "certificate_tools": self.certificate_tools.get_schema_info(),
-                    "acme_tools": self.acme_tools.get_schema_info()
+                    "acme_tools": self.acme_tools.get_schema_info(),
+                    "fabric_tools": self.fabric_tools.get_schema_info()
                 }
             }
             return self._format_response(schema_info, "get_schema_info")

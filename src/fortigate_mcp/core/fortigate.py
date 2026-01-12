@@ -419,6 +419,52 @@ class FortiGateAPI:
             vdom=vdom
         )
 
+    # Security Fabric endpoints
+    def get_security_fabric_config(self, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get Security Fabric (CSF) configuration.
+
+        Returns the Security Fabric settings including fabric name,
+        upstream/downstream configuration, and fabric members.
+        """
+        return self._make_request("GET", "cmdb/system/csf", vdom=vdom)
+
+    def get_security_fabric_status(self, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get Security Fabric runtime status and topology.
+
+        Returns real-time information about the Security Fabric including
+        connected devices, their roles, and connection status.
+        """
+        return self._make_request("GET", "monitor/system/csf", vdom=vdom)
+
+    def get_fabric_devices(self, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get list of fabric devices/connectors.
+
+        Returns information about FortiGate devices configured as
+        fabric connectors.
+        """
+        return self._make_request("GET", "cmdb/system/csf/fabric-device", vdom=vdom)
+
+    def get_fabric_connectors(self, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get fabric connector configuration.
+
+        Returns SDN and cloud connector configurations used in the fabric.
+        """
+        return self._make_request("GET", "cmdb/system/sdn-connector", vdom=vdom)
+
+    def get_ha_status(self, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get High Availability (HA) cluster status.
+
+        Returns HA cluster configuration and member status.
+        """
+        return self._make_request("GET", "monitor/system/ha-peer", vdom=vdom)
+
+    def get_ha_config(self, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get High Availability (HA) configuration.
+
+        Returns HA settings including group name, mode, and priority.
+        """
+        return self._make_request("GET", "cmdb/system/ha", vdom=vdom)
+
 
 class FortiGateManager:
     """Manager for multiple FortiGate devices.
