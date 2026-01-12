@@ -115,22 +115,22 @@ class ACMEClient:
             )
             self.logger.info("Created new ACME account")
         except acme_errors.ConflictError as e:
-            # Account already exists - use only_return_existing
-            self.logger.info(f"Account already exists at {e}, retrieving...")
-            # Set the account URI on the network client
-            acme_client.net.account = messages.RegistrationResource(
-                uri=str(e),
-                body=messages.Registration()
-            )
-            # Query with only_return_existing
-            registration = acme_client.new_account(
-                messages.NewRegistration.from_data(
-                    email=self.email,
-                    terms_of_service_agreed=True,
-                    only_return_existing=True
+            # Account already exists - extract URI from the error
+            account_uri = str(e.location) if hasattr(e, 'location') else str(e)
+            self.logger.info(f"Account already exists at {account_uri}")
+
+            # Create registration resource with the URI
+            # The net.account must be set AFTER we have the URI for subsequent requests
+            registration = messages.RegistrationResource(
+                uri=account_uri,
+                body=messages.Registration(
+                    key=self._get_or_create_account_key(),
+                    status='valid'
                 )
             )
-            self.logger.info("Retrieved existing ACME account")
+            # Set on network client for future requests
+            acme_client.net.account = registration
+            self.logger.info(f"Retrieved existing ACME account at {account_uri}")
         except Exception as e:
             self.logger.error(f"Account registration failed: {e}")
             raise

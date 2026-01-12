@@ -4,7 +4,7 @@
     {
       "parameters": {
         "public": true,
-        "initialMessages": "Welcome to FortiGate MCP Assistant!\n\nI can help you manage your FortiGate firewalls and FortiManager.\n\n**Available Options:**\n\n🔷 **FortiGate API** (Security Fabric Root)\n- List devices\n- View firewall policies\n- Check interfaces and routes\n- View certificates\n- Security Fabric status\n\n🔶 **FortiManager API**\n- List managed devices across ADOMs\n- View policy packages\n- Get certificates from all devices\n- Check device status\n\n**Example commands:**\n- \"List all FortiGate devices\"\n- \"Show firewall policies\"\n- \"Get security fabric status\"\n- \"List FortiManager devices in BACKUP ADOM\"\n- \"Get all certificates from FortiManager\"\n\nWhat would you like to do?",
+        "initialMessages": "Welcome to FortiGate MCP Assistant!\n\n**Available Commands:**\n\n🔷 **FortiGate:**\n- List devices\n- Device status\n- Show firewall policies\n- List interfaces\n- Get routing table\n- List certificates\n- Renew certificate [domain]\n- List address objects\n- List service objects\n- List VIPs\n- Security fabric status\n- HA status\n\n🔶 **FortiManager:**\n- FMG devices\n- FMG devices in BACKUP\n- FMG certificates\n- FMG ADOMs\n- FMG policy packages\n- FMG status\n\n💡 **Examples:**\n- \"List certificates\"\n- \"Renew certificate epm-cloud.net\"\n- \"Show firewall policies\"\n- \"FMG devices in BACKUP\"\n\nType your command:",
         "options": {
           "responseMode": "lastNode"
         }
@@ -18,13 +18,148 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse user input and call MCP server\nconst userInput = $input.first().json.chatInput.toLowerCase();\n\nlet tool = null;\nlet args = {};\n\n// FortiGate tools\nif (userInput.includes('list') && userInput.includes('device')) {\n  tool = 'list_devices';\n  args = {};\n} else if (userInput.includes('firewall') && userInput.includes('polic')) {\n  tool = 'list_firewall_policies';\n  args = { device_id: 'default' };\n} else if (userInput.includes('interface')) {\n  tool = 'list_interfaces';\n  args = { device_id: 'default' };\n} else if (userInput.includes('route') || userInput.includes('routing')) {\n  tool = 'get_routing_table';\n  args = { device_id: 'default' };\n} else if (userInput.includes('fabric') && userInput.includes('status')) {\n  tool = 'get_security_fabric_status';\n  args = { device_id: 'default' };\n} else if (userInput.includes('fabric') && userInput.includes('config')) {\n  tool = 'get_security_fabric_config';\n  args = { device_id: 'default' };\n} else if (userInput.includes('ha') && userInput.includes('status')) {\n  tool = 'get_ha_status';\n  args = { device_id: 'default' };\n} else if (userInput.includes('certificate') && !userInput.includes('fortimanager') && !userInput.includes('fmg')) {\n  tool = 'list_local_certificates';\n  args = { device_id: 'default' };\n} else if (userInput.includes('address') && userInput.includes('object')) {\n  tool = 'list_address_objects';\n  args = { device_id: 'default' };\n} else if (userInput.includes('service') && userInput.includes('object')) {\n  tool = 'list_service_objects';\n  args = { device_id: 'default' };\n} else if (userInput.includes('vip') || userInput.includes('virtual ip')) {\n  tool = 'list_virtual_ips';\n  args = { device_id: 'default' };\n} else if (userInput.includes('device') && userInput.includes('status')) {\n  tool = 'get_device_status';\n  args = { device_id: 'default' };\n}\n// FortiManager tools\nelse if (userInput.includes('fortimanager') || userInput.includes('fmg')) {\n  if (userInput.includes('device') && userInput.includes('status')) {\n    tool = 'fmg_get_all_devices_status';\n    args = { manager_id: 'fmg1' };\n    if (userInput.includes('backup')) args.adom = 'BACKUP';\n    else if (userInput.includes('root')) args.adom = 'root';\n  } else if (userInput.includes('device')) {\n    tool = 'fmg_get_devices';\n    args = { manager_id: 'fmg1' };\n    if (userInput.includes('backup')) args.adom = 'BACKUP';\n    else if (userInput.includes('root')) args.adom = 'root';\n  } else if (userInput.includes('certificate') || userInput.includes('cert')) {\n    tool = 'fmg_get_all_certificates';\n    args = { manager_id: 'fmg1', adoms: 'BACKUP,root' };\n    if (userInput.includes('letsencrypt') || userInput.includes('le ')) {\n      args.filter_letsencrypt = true;\n    }\n  } else if (userInput.includes('adom')) {\n    tool = 'fmg_get_adoms';\n    args = { manager_id: 'fmg1' };\n  } else if (userInput.includes('policy') && userInput.includes('package')) {\n    tool = 'fmg_get_policy_packages';\n    args = { manager_id: 'fmg1' };\n    if (userInput.includes('backup')) args.adom = 'BACKUP';\n  } else if (userInput.includes('status')) {\n    tool = 'fmg_get_system_status';\n    args = { manager_id: 'fmg1' };\n  } else {\n    tool = 'fmg_get_devices';\n    args = { manager_id: 'fmg1', adom: 'BACKUP' };\n  }\n}\n// Help\nelse if (userInput.includes('help') || userInput.includes('tool') || userInput.includes('command')) {\n  return {\n    output: '**Available Commands:**\\n\\n🔷 **FortiGate:**\\n- \"List devices\" - Show registered devices\\n- \"Show firewall policies\" - Display firewall rules\\n- \"Get interfaces\" - List network interfaces\\n- \"Get routing table\" - Show routes\\n- \"Security fabric status\" - View fabric topology\\n- \"HA status\" - High availability status\\n- \"List certificates\" - Local certificates\\n\\n🔶 **FortiManager:**\\n- \"FMG devices\" - List managed devices\\n- \"FMG devices in BACKUP\" - Devices in BACKUP ADOM\\n- \"FMG certificates\" - All certificates\\n- \"FMG ADOMs\" - List administrative domains\\n- \"FMG policy packages\" - Policy packages\\n\\nJust type your command!'\n  };\n}\n\nif (!tool) {\n  return {\n    output: `I didn't understand: \"${$input.first().json.chatInput}\"\\n\\nTry: \"List devices\", \"Show firewall policies\", \"FMG devices\", or \"Help\"`\n  };\n}\n\n// Call MCP server\nconst MCP_URL = 'http://10.129.255.6:8814/fortigate-mcp';\n\ntry {\n  // Initialize session\n  const initResponse = await fetch(MCP_URL, {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\n      'Accept': 'application/json, text/event-stream'\n    },\n    body: JSON.stringify({\n      jsonrpc: '2.0',\n      id: 1,\n      method: 'initialize',\n      params: {\n        protocolVersion: '2024-11-05',\n        capabilities: {},\n        clientInfo: { name: 'n8n', version: '1.0' }\n      }\n    })\n  });\n  \n  const initText = await initResponse.text();\n  // Parse SSE response\n  const initData = initText.split('\\n').find(l => l.startsWith('data: '));\n  if (!initData) throw new Error('No init response');\n  const initJson = JSON.parse(initData.replace('data: ', ''));\n  \n  // Get session ID from response headers or generate one\n  const sessionId = initResponse.headers.get('mcp-session-id') || 'n8n-session-' + Date.now();\n  \n  // Call the tool\n  const toolResponse = await fetch(MCP_URL, {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\n      'Accept': 'application/json, text/event-stream',\n      'mcp-session-id': sessionId\n    },\n    body: JSON.stringify({\n      jsonrpc: '2.0',\n      id: 2,\n      method: 'tools/call',\n      params: {\n        name: tool,\n        arguments: args\n      }\n    })\n  });\n  \n  const toolText = await toolResponse.text();\n  // Parse SSE response\n  const toolData = toolText.split('\\n').find(l => l.startsWith('data: '));\n  if (!toolData) throw new Error('No tool response');\n  const toolJson = JSON.parse(toolData.replace('data: ', ''));\n  \n  // Format output\n  let output = `**Tool:** \\`${tool}\\`\\n\\n`;\n  \n  if (toolJson.error) {\n    output += `❌ Error: ${toolJson.error.message}`;\n  } else if (toolJson.result?.content) {\n    const content = toolJson.result.content;\n    if (Array.isArray(content)) {\n      output += content.map(c => c.text || JSON.stringify(c)).join('\\n');\n    } else {\n      output += JSON.stringify(content, null, 2);\n    }\n  } else {\n    output += JSON.stringify(toolJson.result || toolJson, null, 2);\n  }\n  \n  // Truncate if too long\n  if (output.length > 4000) {\n    output = output.substring(0, 4000) + '\\n\\n... (truncated)';\n  }\n  \n  return { output };\n  \n} catch (error) {\n  return {\n    output: `❌ Error connecting to MCP server: ${error.message}\\n\\nPlease ensure the FortiGate MCP server is running at ${MCP_URL}`\n  };\n}"
+        "jsCode": "// Parse user input and determine tool\nconst userInput = $input.first().json.chatInput.toLowerCase();\nconst originalInput = $input.first().json.chatInput;\n\nlet tool = null;\nlet args = {};\n\n// Certificate renewal (check first - higher priority)\nif (userInput.includes('renew') && (userInput.includes('cert') || userInput.includes('certificate'))) {\n  tool = 'request_and_import_certificate';\n  // Extract domain from input - look for common TLDs\n  const domainMatch = originalInput.match(/([a-zA-Z0-9*.-]+\\.(com|net|org|education|io|dev|cloud|nl|eu|uk|de))/i);\n  if (domainMatch) {\n    const domain = domainMatch[1].toLowerCase();\n    // Generate cert name with date\n    const today = new Date();\n    const dateStr = today.toISOString().split('T')[0];\n    const certName = `${domain.replace('*.', 'wildcard.')}.${dateStr}`;\n    args = { \n      device_id: 'default', \n      domains: [domain], \n      cert_name: certName,\n      staging: false\n    };\n  } else {\n    return {\n      output: `❌ Could not extract domain from: \"${originalInput}\"\\n\\nPlease specify the domain to renew, e.g.:\\n- \"Renew certificate epm-cloud.net\"\\n- \"Renew cert *.inlumi.education\"`,\n      tool: null,\n      args: {}\n    };\n  }\n}\n// FortiGate tools\nelse if (userInput.includes('list') && userInput.includes('device')) {\n  tool = 'list_devices';\n  args = {};\n} else if (userInput.includes('firewall') && userInput.includes('polic')) {\n  tool = 'list_firewall_policies';\n  args = { device_id: 'default' };\n} else if (userInput.includes('interface')) {\n  tool = 'list_interfaces';\n  args = { device_id: 'default' };\n} else if (userInput.includes('route') || userInput.includes('routing')) {\n  tool = 'get_routing_table';\n  args = { device_id: 'default' };\n} else if (userInput.includes('fabric') && userInput.includes('status')) {\n  tool = 'get_security_fabric_status';\n  args = { device_id: 'default' };\n} else if (userInput.includes('fabric') && userInput.includes('config')) {\n  tool = 'get_security_fabric_config';\n  args = { device_id: 'default' };\n} else if (userInput.includes('ha') && userInput.includes('status')) {\n  tool = 'get_ha_status';\n  args = { device_id: 'default' };\n} else if (userInput.includes('certificate') && !userInput.includes('fortimanager') && !userInput.includes('fmg')) {\n  tool = 'list_local_certificates';\n  args = { device_id: 'default' };\n} else if (userInput.includes('address') && userInput.includes('object')) {\n  tool = 'list_address_objects';\n  args = { device_id: 'default' };\n} else if (userInput.includes('service') && userInput.includes('object')) {\n  tool = 'list_service_objects';\n  args = { device_id: 'default' };\n} else if (userInput.includes('vip') || userInput.includes('virtual ip')) {\n  tool = 'list_virtual_ips';\n  args = { device_id: 'default' };\n} else if (userInput.includes('device') && userInput.includes('status')) {\n  tool = 'get_device_status';\n  args = { device_id: 'default' };\n}\n// FortiManager tools\nelse if (userInput.includes('fortimanager') || userInput.includes('fmg')) {\n  if (userInput.includes('device') && userInput.includes('status')) {\n    tool = 'fmg_get_all_devices_status';\n    args = { manager_id: 'fmg1' };\n    if (userInput.includes('backup')) args.adom = 'BACKUP';\n    else if (userInput.includes('root')) args.adom = 'root';\n  } else if (userInput.includes('device')) {\n    tool = 'fmg_get_devices';\n    args = { manager_id: 'fmg1' };\n    if (userInput.includes('backup')) args.adom = 'BACKUP';\n    else if (userInput.includes('root')) args.adom = 'root';\n  } else if (userInput.includes('certificate') || userInput.includes('cert')) {\n    tool = 'fmg_get_all_certificates';\n    args = { manager_id: 'fmg1', adoms: 'BACKUP,root' };\n    if (userInput.includes('letsencrypt') || userInput.includes('le ')) {\n      args.filter_letsencrypt = true;\n    }\n  } else if (userInput.includes('adom')) {\n    tool = 'fmg_get_adoms';\n    args = { manager_id: 'fmg1' };\n  } else if (userInput.includes('policy') && userInput.includes('package')) {\n    tool = 'fmg_get_policy_packages';\n    args = { manager_id: 'fmg1' };\n    if (userInput.includes('backup')) args.adom = 'BACKUP';\n  } else if (userInput.includes('status')) {\n    tool = 'fmg_get_system_status';\n    args = { manager_id: 'fmg1' };\n  } else {\n    tool = 'fmg_get_devices';\n    args = { manager_id: 'fmg1', adom: 'BACKUP' };\n  }\n}\n// Help\nelse if (userInput.includes('help') || userInput.includes('tool') || userInput.includes('command')) {\n  return {\n    output: '**Available Commands:**\\n\\n🔷 **FortiGate:**\\n- \"List devices\" - Show registered devices\\n- \"Show firewall policies\" - Display firewall rules\\n- \"Get interfaces\" - List network interfaces\\n- \"Get routing table\" - Show routes\\n- \"Security fabric status\" - View fabric topology\\n- \"HA status\" - High availability status\\n- \"List certificates\" - Local certificates\\n- \"Renew certificate [domain]\" - Request Let\\'s Encrypt cert\\n\\n🔶 **FortiManager:**\\n- \"FMG devices\" - List managed devices\\n- \"FMG devices in BACKUP\" - Devices in BACKUP ADOM\\n- \"FMG certificates\" - All certificates\\n- \"FMG ADOMs\" - List administrative domains\\n- \"FMG policy packages\" - Policy packages\\n\\nJust type your command!',\n    tool: null,\n    args: {}\n  };\n}\n\nif (!tool) {\n  return {\n    output: `I didn't understand: \"${originalInput}\"\\n\\nTry: \"List devices\", \"Show firewall policies\", \"Renew certificate domain.com\", or \"Help\"`,\n    tool: null,\n    args: {}\n  };\n}\n\nreturn {\n  tool: tool,\n  args: args,\n  originalInput: originalInput\n};"
       },
-      "id": "mcp-handler",
-      "name": "MCP Handler",
+      "id": "parse-input",
+      "name": "Parse Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-tool",
+              "leftValue": "={{ $json.tool }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-tool",
+      "name": "Has Valid Tool?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.129.255.6:8814/fortigate-mcp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json, text/event-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"initialize\",\n  \"params\": {\n    \"protocolVersion\": \"2024-11-05\",\n    \"capabilities\": {},\n    \"clientInfo\": { \"name\": \"n8n\", \"version\": \"1.0\" }\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "init-mcp",
+      "name": "Init MCP Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract session ID from init response\nconst response = $input.first().json;\nconst headers = response.headers || {};\nconst sessionId = headers['mcp-session-id'] || 'n8n-' + Date.now();\n\n// Pass through tool info\nconst parseInput = $('Parse Input').first().json;\n\nreturn {\n  sessionId: sessionId,\n  tool: parseInput.tool,\n  args: parseInput.args,\n  originalInput: parseInput.originalInput\n};"
+      },
+      "id": "extract-session",
+      "name": "Extract Session",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.129.255.6:8814/fortigate-mcp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json, text/event-stream"
+            },
+            {
+              "name": "mcp-session-id",
+              "value": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"{{ $json.tool }}\",\n    \"arguments\": {{ JSON.stringify($json.args) }}\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 180000
+        }
+      },
+      "id": "call-tool",
+      "name": "Call MCP Tool",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse SSE response and format output\nconst response = $input.first().json;\nconst body = response.body || response.data || '';\nconst sessionData = $('Extract Session').first().json;\nconst tool = sessionData.tool;\nconst args = sessionData.args;\n\nlet output = `**Tool:** \\`${tool}\\`\\n`;\nif (tool === 'request_and_import_certificate' && args.domains) {\n  output += `**Domain:** ${args.domains[0]}\\n**Cert Name:** ${args.cert_name}\\n\\n`;\n} else {\n  output += '\\n';\n}\n\ntry {\n  // Parse SSE format: event: message\\ndata: {...}\n  const lines = body.split('\\n');\n  const dataLine = lines.find(l => l.startsWith('data: '));\n  \n  if (dataLine) {\n    const jsonStr = dataLine.replace('data: ', '');\n    const result = JSON.parse(jsonStr);\n    \n    if (result.error) {\n      output += `❌ Error: ${result.error.message}`;\n    } else if (result.result?.content) {\n      const content = result.result.content;\n      if (Array.isArray(content)) {\n        output += content.map(c => c.text || JSON.stringify(c)).join('\\n');\n      } else {\n        output += JSON.stringify(content, null, 2);\n      }\n    } else {\n      output += JSON.stringify(result.result || result, null, 2);\n    }\n  } else {\n    output += body || 'No response';\n  }\n} catch (e) {\n  output += `Error parsing response: ${e.message}\\n${body}`;\n}\n\n// Truncate if too long\nif (output.length > 4000) {\n  output = output.substring(0, 4000) + '\\n\\n... (truncated)';\n}\n\nreturn { output: output };"
+      },
+      "id": "format-output",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return pre-built response (help or no match)\nconst data = $input.first().json;\nreturn { output: data.output };"
+      },
+      "id": "direct-response",
+      "name": "Direct Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 400]
     }
   ],
   "connections": {
@@ -32,7 +167,69 @@
       "main": [
         [
           {
-            "node": "MCP Handler",
+            "node": "Parse Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Input": {
+      "main": [
+        [
+          {
+            "node": "Has Valid Tool?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Valid Tool?": {
+      "main": [
+        [
+          {
+            "node": "Init MCP Session",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Direct Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init MCP Session": {
+      "main": [
+        [
+          {
+            "node": "Extract Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Session": {
+      "main": [
+        [
+          {
+            "node": "Call MCP Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call MCP Tool": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
             "type": "main",
             "index": 0
           }
