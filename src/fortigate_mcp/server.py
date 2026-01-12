@@ -34,6 +34,7 @@ from .tools.network import NetworkTools
 from .tools.routing import RoutingTools
 from .tools.virtual_ip import VirtualIPTools
 from .tools.certificate import CertificateTools
+from .tools.acme import ACMETools
 from .tools.definitions import *
 
 class FortiGateMCPServer:
@@ -62,6 +63,23 @@ class FortiGateMCPServer:
         self.routing_tools = RoutingTools(self.fortigate_manager)
         self.virtual_ip_tools = VirtualIPTools(self.fortigate_manager)
         self.certificate_tools = CertificateTools(self.fortigate_manager)
+
+        # Initialize ACME tools with config from environment or config file
+        acme_config = {
+            "cloudflare_api_token": (
+                self.config.acme.cloudflare_api_token or
+                os.environ.get("CLOUDFLARE_API_TOKEN")
+            ),
+            "acme_email": (
+                self.config.acme.email or
+                os.environ.get("ACME_EMAIL")
+            ),
+            "acme_account_key_path": (
+                self.config.acme.account_key_path or
+                os.environ.get("ACME_ACCOUNT_KEY_PATH")
+            )
+        }
+        self.acme_tools = ACMETools(self.fortigate_manager, acme_config)
         
         # Initialize MCP server
         self.mcp = FastMCP("FortiGateMCP")
@@ -386,6 +404,71 @@ class FortiGateMCPServer:
         ):
             return self.certificate_tools.delete_remote_certificate(device_id, cert_name, vdom)
 
+        # ACME/Let's Encrypt tools
+        @self.mcp.tool(description=REQUEST_CERTIFICATE_DESC)
+        async def request_certificate(
+            domains: Annotated[list, Field(description="List of domain names for the certificate")],
+            email: Annotated[Optional[str], Field(description="Contact email for Let's Encrypt")] = None,
+            cloudflare_api_token: Annotated[Optional[str], Field(description="Cloudflare API token")] = None,
+            key_type: Annotated[str, Field(description="Key type (rsa or ec)")] = "rsa",
+            key_size: Annotated[int, Field(description="Key size for RSA")] = 2048,
+            staging: Annotated[bool, Field(description="Use staging environment")] = False
+        ):
+            return self.acme_tools.request_certificate(
+                domains, email, cloudflare_api_token, key_type, key_size, staging
+            )
+
+        @self.mcp.tool(description=REQUEST_AND_IMPORT_CERTIFICATE_DESC)
+        async def request_and_import_certificate(
+            device_id: Annotated[str, Field(description="FortiGate device identifier")],
+            domains: Annotated[list, Field(description="List of domain names for the certificate")],
+            cert_name: Annotated[str, Field(description="Name for the certificate in FortiGate")],
+            email: Annotated[Optional[str], Field(description="Contact email for Let's Encrypt")] = None,
+            cloudflare_api_token: Annotated[Optional[str], Field(description="Cloudflare API token")] = None,
+            key_type: Annotated[str, Field(description="Key type (rsa or ec)")] = "rsa",
+            key_size: Annotated[int, Field(description="Key size for RSA")] = 2048,
+            staging: Annotated[bool, Field(description="Use staging environment")] = False,
+            vdom: Annotated[Optional[str], Field(description="Virtual Domain")] = None
+        ):
+            return self.acme_tools.request_and_import_certificate(
+                device_id, domains, cert_name, email, cloudflare_api_token,
+                key_type, key_size, staging, vdom
+            )
+
+        @self.mcp.tool(description=IMPORT_CERTIFICATE_DESC)
+        async def import_certificate(
+            device_id: Annotated[str, Field(description="FortiGate device identifier")],
+            cert_name: Annotated[str, Field(description="Name for the certificate in FortiGate")],
+            certificate: Annotated[str, Field(description="PEM-encoded certificate")],
+            private_key: Annotated[str, Field(description="PEM-encoded private key")],
+            password: Annotated[Optional[str], Field(description="Password for encrypted key")] = None,
+            vdom: Annotated[Optional[str], Field(description="Virtual Domain")] = None
+        ):
+            return self.acme_tools.import_certificate(
+                device_id, cert_name, certificate, private_key, password, vdom
+            )
+
+        @self.mcp.tool(description=IMPORT_CA_CERTIFICATE_DESC)
+        async def import_ca_certificate(
+            device_id: Annotated[str, Field(description="FortiGate device identifier")],
+            cert_name: Annotated[str, Field(description="Name for the CA certificate in FortiGate")],
+            certificate: Annotated[str, Field(description="PEM-encoded CA certificate")],
+            vdom: Annotated[Optional[str], Field(description="Virtual Domain")] = None
+        ):
+            return self.acme_tools.import_ca_certificate(device_id, cert_name, certificate, vdom)
+
+        @self.mcp.tool(description=LIST_CLOUDFLARE_ZONES_DESC)
+        async def list_cloudflare_zones(
+            cloudflare_api_token: Annotated[Optional[str], Field(description="Cloudflare API token")] = None
+        ):
+            return self.acme_tools.list_cloudflare_zones(cloudflare_api_token)
+
+        @self.mcp.tool(description=VERIFY_CLOUDFLARE_TOKEN_DESC)
+        async def verify_cloudflare_token(
+            cloudflare_api_token: Annotated[Optional[str], Field(description="Cloudflare API token")] = None
+        ):
+            return self.acme_tools.verify_cloudflare_token(cloudflare_api_token)
+
         # System tools
         @self.mcp.tool(description=HEALTH_CHECK_DESC)
         async def health_check():
@@ -413,6 +496,7 @@ class FortiGateMCPServer:
                     "Routing Management (8 tools)",
                     "Virtual IP Management (5 tools)",
                     "Certificate Management (11 tools)",
+                    "ACME/Let's Encrypt (6 tools)",
                     "System Tools (2 tools)"
                 ]
             }

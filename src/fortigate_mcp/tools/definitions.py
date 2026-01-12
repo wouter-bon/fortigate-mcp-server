@@ -789,3 +789,109 @@ Parameters:
 Returns:
 - Deletion status confirmation
 """
+
+# ACME/Let's Encrypt Tool Descriptions
+REQUEST_CERTIFICATE_DESC = """
+Request a Let's Encrypt certificate using Cloudflare DNS challenge.
+
+This tool uses the ACME protocol to request a free SSL/TLS certificate
+from Let's Encrypt, using Cloudflare DNS for domain validation.
+
+Parameters:
+- domains: List of domain names for the certificate (first is primary)
+- email: Contact email for Let's Encrypt account (optional if configured)
+- cloudflare_api_token: Cloudflare API token with DNS edit permissions (optional if configured)
+- key_type: Key type - 'rsa' or 'ec' (default: rsa)
+- key_size: Key size for RSA - 2048 or 4096 (default: 2048)
+- staging: Use Let's Encrypt staging environment for testing (default: false)
+
+Returns:
+- Certificate details including subject, issuer, validity
+- Private key in PEM format
+- Certificate in PEM format
+- Certificate chain in PEM format
+"""
+
+REQUEST_AND_IMPORT_CERTIFICATE_DESC = """
+Request a Let's Encrypt certificate and import it to FortiGate.
+
+This tool combines certificate request and import into a single operation:
+1. Requests a certificate from Let's Encrypt via ACME
+2. Uses Cloudflare DNS for domain validation
+3. Imports the certificate directly to the FortiGate device
+
+Parameters:
+- device_id: Identifier of the FortiGate device
+- domains: List of domain names for the certificate
+- cert_name: Name for the certificate in FortiGate
+- email: Contact email for Let's Encrypt (optional if configured)
+- cloudflare_api_token: Cloudflare API token (optional if configured)
+- key_type: Key type - 'rsa' or 'ec' (default: rsa)
+- key_size: Key size for RSA (default: 2048)
+- staging: Use staging environment for testing (default: false)
+- vdom: Virtual Domain name (optional, uses device default)
+
+Returns:
+- Import status confirmation
+- Certificate details including validity information
+"""
+
+IMPORT_CERTIFICATE_DESC = """
+Import an existing certificate to a FortiGate device.
+
+This tool imports a PEM-encoded certificate and private key
+to a FortiGate device's local certificate store.
+
+Parameters:
+- device_id: Identifier of the FortiGate device
+- cert_name: Name for the certificate in FortiGate
+- certificate: PEM-encoded certificate content
+- private_key: PEM-encoded private key content
+- password: Password for encrypted private key (optional)
+- vdom: Virtual Domain name (optional, uses device default)
+
+Returns:
+- Import status confirmation
+"""
+
+IMPORT_CA_CERTIFICATE_DESC = """
+Import a CA certificate to a FortiGate device.
+
+This tool imports a PEM-encoded CA certificate to a FortiGate
+device's trusted CA store.
+
+Parameters:
+- device_id: Identifier of the FortiGate device
+- cert_name: Name for the CA certificate in FortiGate
+- certificate: PEM-encoded CA certificate content
+- vdom: Virtual Domain name (optional, uses device default)
+
+Returns:
+- Import status confirmation
+"""
+
+LIST_CLOUDFLARE_ZONES_DESC = """
+List Cloudflare zones available for DNS challenges.
+
+This tool lists all DNS zones in your Cloudflare account that
+can be used for ACME DNS-01 domain validation.
+
+Parameters:
+- cloudflare_api_token: Cloudflare API token (optional if configured)
+
+Returns:
+- List of zones with name, ID, and status
+"""
+
+VERIFY_CLOUDFLARE_TOKEN_DESC = """
+Verify Cloudflare API token is valid.
+
+This tool verifies that the Cloudflare API token has valid
+permissions for DNS operations required for ACME challenges.
+
+Parameters:
+- cloudflare_api_token: Cloudflare API token (optional if configured)
+
+Returns:
+- Token validation status
+"""

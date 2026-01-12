@@ -79,7 +79,7 @@ class ServerConfig(BaseModel):
 
 class RateLimitConfig(BaseModel):
     """Model for rate limiting configuration.
-    
+
     Defines rate limiting parameters to prevent
     API abuse and ensure stable performance.
     """
@@ -87,9 +87,23 @@ class RateLimitConfig(BaseModel):
     max_requests_per_minute: int = Field(default=60, description="Maximum requests per minute")
     burst_size: int = Field(default=10, description="Burst request allowance")
 
+class ACMEConfig(BaseModel):
+    """Model for ACME/Let's Encrypt configuration.
+
+    Defines configuration for automated certificate issuance
+    using Let's Encrypt with Cloudflare DNS validation.
+    """
+    enabled: bool = Field(default=False, description="Enable ACME certificate management")
+    email: Optional[str] = Field(default=None, description="Contact email for Let's Encrypt account")
+    staging: bool = Field(default=False, description="Use Let's Encrypt staging environment")
+    account_key_path: Optional[str] = Field(default=None, description="Path to store ACME account key")
+    cloudflare_api_token: Optional[str] = Field(default=None, description="Cloudflare API token for DNS validation")
+    default_key_type: str = Field(default="rsa", description="Default key type (rsa or ec)")
+    default_key_size: int = Field(default=2048, description="Default key size for RSA keys")
+
 class Config(BaseModel):
     """Root configuration model.
-    
+
     Combines all configuration models into a single validated
     configuration object. Provides the complete server configuration.
     """
@@ -98,6 +112,7 @@ class Config(BaseModel):
     auth: AuthConfig = Field(default_factory=AuthConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     rate_limiting: RateLimitConfig = Field(default_factory=RateLimitConfig)
+    acme: ACMEConfig = Field(default_factory=ACMEConfig)
 
 # Parameter models for tool validation
 class DeviceCommandParams(BaseModel):

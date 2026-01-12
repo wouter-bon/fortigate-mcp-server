@@ -333,6 +333,92 @@ class FortiGateAPI:
         """Delete a remote certificate."""
         return self._make_request("DELETE", f"cmdb/certificate/remote/{cert_name}", vdom=vdom)
 
+    def import_local_certificate(
+        self,
+        cert_name: str,
+        certificate: str,
+        private_key: str,
+        password: Optional[str] = None,
+        scope: str = "global",
+        vdom: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Import a local certificate with private key.
+
+        Args:
+            cert_name: Name for the certificate
+            certificate: PEM-encoded certificate (or base64)
+            private_key: PEM-encoded private key (or base64)
+            password: Optional password for encrypted private key
+            scope: Certificate scope ('global' or 'vdom')
+            vdom: Virtual domain
+
+        Returns:
+            Import result
+        """
+        import base64
+
+        # Ensure certificate and key are base64 encoded
+        if certificate.startswith("-----"):
+            certificate = base64.b64encode(certificate.encode()).decode()
+        if private_key.startswith("-----"):
+            private_key = base64.b64encode(private_key.encode()).decode()
+
+        data = {
+            "type": "regular",
+            "certname": cert_name,
+            "file_content": certificate,
+            "key_file_content": private_key,
+            "scope": scope
+        }
+
+        if password:
+            data["password"] = password
+
+        return self._make_request(
+            "POST",
+            "monitor/vpn-certificate/local/import",
+            data=data,
+            vdom=vdom
+        )
+
+    def import_ca_certificate(
+        self,
+        cert_name: str,
+        certificate: str,
+        scope: str = "global",
+        vdom: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Import a CA certificate.
+
+        Args:
+            cert_name: Name for the CA certificate
+            certificate: PEM-encoded certificate (or base64)
+            scope: Certificate scope ('global' or 'vdom')
+            vdom: Virtual domain
+
+        Returns:
+            Import result
+        """
+        import base64
+
+        # Ensure certificate is base64 encoded
+        if certificate.startswith("-----"):
+            certificate = base64.b64encode(certificate.encode()).decode()
+
+        data = {
+            "type": "ca",
+            "import_method": "file",
+            "file_content": certificate,
+            "scope": scope
+        }
+
+        return self._make_request(
+            "POST",
+            "monitor/vpn-certificate/ca/import",
+            data=data,
+            vdom=vdom
+        )
+
 
 class FortiGateManager:
     """Manager for multiple FortiGate devices.

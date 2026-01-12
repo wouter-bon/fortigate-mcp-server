@@ -7,6 +7,7 @@ from .network import NetworkTools
 from .routing import RoutingTools
 from .virtual_ip import VirtualIPTools
 from .certificate import CertificateTools
+from .acme import ACMETools
 
 __all__ = [
     "FortiGateTool",
@@ -15,5 +16,6 @@ __all__ = [
     "NetworkTools",
     "RoutingTools",
     "VirtualIPTools",
-    "CertificateTools"
+    "CertificateTools",
+    "ACMETools"
 ]

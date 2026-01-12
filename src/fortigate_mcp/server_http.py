@@ -32,6 +32,7 @@ from .tools.network import NetworkTools
 from .tools.routing import RoutingTools
 from .tools.virtual_ip import VirtualIPTools
 from .tools.certificate import CertificateTools
+from .tools.acme import ACMETools
 
 logger = logging.getLogger("fortigate-mcp.http")
 
@@ -89,6 +90,23 @@ class FortiGateMCPHTTPServer:
         self.routing_tools = RoutingTools(self.fortigate_manager)
         self.virtual_ip_tools = VirtualIPTools(self.fortigate_manager)
         self.certificate_tools = CertificateTools(self.fortigate_manager)
+
+        # Initialize ACME tools with config from environment or config file
+        acme_config = {
+            "cloudflare_api_token": (
+                self.config.acme.cloudflare_api_token or
+                os.environ.get("CLOUDFLARE_API_TOKEN")
+            ),
+            "acme_email": (
+                self.config.acme.email or
+                os.environ.get("ACME_EMAIL")
+            ),
+            "acme_account_key_path": (
+                self.config.acme.account_key_path or
+                os.environ.get("ACME_ACCOUNT_KEY_PATH")
+            )
+        }
+        self.acme_tools = ACMETools(self.fortigate_manager, acme_config)
         
         # Initialize FastMCP
         self.mcp = FastMCP("FortiGateMCP-HTTP")
@@ -291,6 +309,67 @@ class FortiGateMCPHTTPServer:
         def delete_remote_certificate(device_id: str, cert_name: str, vdom: Optional[str] = None):
             return self.certificate_tools.delete_remote_certificate(device_id, cert_name, vdom)
 
+        # ACME/Let's Encrypt tools
+        @self.mcp.tool(description="Request a Let's Encrypt certificate using Cloudflare DNS challenge")
+        def request_certificate(
+            domains: list,
+            email: Optional[str] = None,
+            cloudflare_api_token: Optional[str] = None,
+            key_type: str = "rsa",
+            key_size: int = 2048,
+            staging: bool = False
+        ):
+            return self.acme_tools.request_certificate(
+                domains, email, cloudflare_api_token, key_type, key_size, staging
+            )
+
+        @self.mcp.tool(description="Request Let's Encrypt certificate and import to FortiGate")
+        def request_and_import_certificate(
+            device_id: str,
+            domains: list,
+            cert_name: str,
+            email: Optional[str] = None,
+            cloudflare_api_token: Optional[str] = None,
+            key_type: str = "rsa",
+            key_size: int = 2048,
+            staging: bool = False,
+            vdom: Optional[str] = None
+        ):
+            return self.acme_tools.request_and_import_certificate(
+                device_id, domains, cert_name, email, cloudflare_api_token,
+                key_type, key_size, staging, vdom
+            )
+
+        @self.mcp.tool(description="Import an existing certificate to FortiGate")
+        def import_certificate(
+            device_id: str,
+            cert_name: str,
+            certificate: str,
+            private_key: str,
+            password: Optional[str] = None,
+            vdom: Optional[str] = None
+        ):
+            return self.acme_tools.import_certificate(
+                device_id, cert_name, certificate, private_key, password, vdom
+            )
+
+        @self.mcp.tool(description="Import a CA certificate to FortiGate")
+        def import_ca_certificate(
+            device_id: str,
+            cert_name: str,
+            certificate: str,
+            vdom: Optional[str] = None
+        ):
+            return self.acme_tools.import_ca_certificate(device_id, cert_name, certificate, vdom)
+
+        @self.mcp.tool(description="List Cloudflare zones available for DNS challenges")
+        def list_cloudflare_zones(cloudflare_api_token: Optional[str] = None):
+            return self.acme_tools.list_cloudflare_zones(cloudflare_api_token)
+
+        @self.mcp.tool(description="Verify Cloudflare API token is valid")
+        def verify_cloudflare_token(cloudflare_api_token: Optional[str] = None):
+            return self.acme_tools.verify_cloudflare_token(cloudflare_api_token)
+
         # System tools
         @self.mcp.tool(description="Test FortiGate connection")
         def test_connection():
@@ -362,7 +441,8 @@ class FortiGateMCPHTTPServer:
                     "network_tools": self.network_tools.get_schema_info(),
                     "routing_tools": self.routing_tools.get_schema_info(),
                     "virtual_ip_tools": self.virtual_ip_tools.get_schema_info(),
-                    "certificate_tools": self.certificate_tools.get_schema_info()
+                    "certificate_tools": self.certificate_tools.get_schema_info(),
+                    "acme_tools": self.acme_tools.get_schema_info()
                 }
             }
             return self._format_response(schema_info, "get_schema_info")
