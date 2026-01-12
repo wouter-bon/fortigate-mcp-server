@@ -36,6 +36,7 @@ from .tools.certificate import CertificateTools
 from .tools.acme import ACMETools
 from .tools.fabric import FabricTools
 from .tools.fortimanager import FortiManagerTools
+from .tools.packet_capture import PacketCaptureTools
 
 logger = logging.getLogger("fortigate-mcp.http")
 
@@ -111,6 +112,7 @@ class FortiGateMCPHTTPServer:
         }
         self.acme_tools = ACMETools(self.fortigate_manager, acme_config)
         self.fabric_tools = FabricTools(self.fortigate_manager)
+        self.packet_capture_tools = PacketCaptureTools(self.fortigate_manager)
 
         # Initialize FortiManager
         self.fmg_manager = FortiManagerManager()
@@ -407,6 +409,51 @@ class FortiGateMCPHTTPServer:
         def get_fabric_topology(device_id: str, vdom: Optional[str] = None):
             return self.fabric_tools.get_fabric_topology(device_id, vdom)
 
+        # Packet Capture tools
+        @self.mcp.tool(description="List all packet capture profiles on a FortiGate device")
+        def list_packet_captures(device_id: str, vdom: Optional[str] = None):
+            return self.packet_capture_tools.list_packet_captures(device_id, vdom)
+
+        @self.mcp.tool(description="Create a packet capture profile with optional filters (interface, src_ip, dst_ip, protocol, port)")
+        def create_packet_capture(
+            device_id: str,
+            interface: str = "any",
+            host: Optional[str] = None,
+            src_ip: Optional[str] = None,
+            dst_ip: Optional[str] = None,
+            protocol: Optional[str] = None,
+            port: Optional[int] = None,
+            max_packet_count: int = 10000,
+            vdom: Optional[str] = None
+        ):
+            return self.packet_capture_tools.create_packet_capture(
+                device_id, interface, host, src_ip, dst_ip, protocol, port, max_packet_count, vdom
+            )
+
+        @self.mcp.tool(description="Get status of a packet capture (packets captured, state, etc.)")
+        def get_packet_capture_status(device_id: str, capture_id: int, vdom: Optional[str] = None):
+            return self.packet_capture_tools.get_packet_capture_status(device_id, capture_id, vdom)
+
+        @self.mcp.tool(description="Start a packet capture")
+        def start_packet_capture(device_id: str, capture_id: int, vdom: Optional[str] = None):
+            return self.packet_capture_tools.start_packet_capture(device_id, capture_id, vdom)
+
+        @self.mcp.tool(description="Stop a packet capture")
+        def stop_packet_capture(device_id: str, capture_id: int, vdom: Optional[str] = None):
+            return self.packet_capture_tools.stop_packet_capture(device_id, capture_id, vdom)
+
+        @self.mcp.tool(description="Download captured packets as PCAP")
+        def download_packet_capture(device_id: str, capture_id: int, vdom: Optional[str] = None):
+            return self.packet_capture_tools.download_packet_capture(device_id, capture_id, vdom)
+
+        @self.mcp.tool(description="Delete a packet capture profile")
+        def delete_packet_capture(device_id: str, capture_id: int, vdom: Optional[str] = None):
+            return self.packet_capture_tools.delete_packet_capture(device_id, capture_id, vdom)
+
+        @self.mcp.tool(description="Clear captured packets from a capture profile")
+        def clear_packet_capture(device_id: str, capture_id: int, vdom: Optional[str] = None):
+            return self.packet_capture_tools.clear_packet_capture(device_id, capture_id, vdom)
+
         # FortiManager tools
         @self.mcp.tool(description="List registered FortiManager instances")
         def fmg_list_managers():
@@ -567,6 +614,7 @@ class FortiGateMCPHTTPServer:
                     "certificate_tools": self.certificate_tools.get_schema_info(),
                     "acme_tools": self.acme_tools.get_schema_info(),
                     "fabric_tools": self.fabric_tools.get_schema_info(),
+                    "packet_capture_tools": self.packet_capture_tools.get_schema_info(),
                     "fortimanager_tools": {
                         "name": "fortimanager_tools",
                         "description": "FortiManager centralized management tools",

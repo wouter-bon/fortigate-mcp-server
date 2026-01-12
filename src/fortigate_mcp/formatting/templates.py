@@ -686,11 +686,11 @@ class FortiGateTemplates:
     @staticmethod
     def health_status(status: str, details: Dict[str, Any]) -> str:
         """Format health check status.
-        
+
         Args:
             status: Overall health status
             details: Health check details
-            
+
         Returns:
             Formatted health status
         """
@@ -700,14 +700,118 @@ class FortiGateTemplates:
             f"  Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             ""
         ]
-        
+
         if details.get("registered_devices") is not None:
             lines.append(f"  Registered Devices: {details['registered_devices']}")
-        
+
         if details.get("server_version"):
             lines.append(f"  Server Version: {details['server_version']}")
-        
+
         if details.get("uptime"):
             lines.append(f"  Uptime: {details['uptime']}")
-        
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def packet_captures(captures_data: Dict[str, Any]) -> str:
+        """Format packet capture profiles list.
+
+        Args:
+            captures_data: Packet captures response from FortiGate API
+
+        Returns:
+            Formatted packet captures information
+        """
+        lines = ["Packet Capture Profiles", ""]
+
+        if "results" in captures_data and captures_data["results"]:
+            captures = captures_data["results"]
+
+            for capture in captures:
+                capture_id = capture.get("id", "N/A")
+                interface = capture.get("interface", "N/A")
+                filter_str = capture.get("filter", "none")
+                max_count = capture.get("max-packet-count", "N/A")
+                status = capture.get("status", "unknown")
+
+                lines.extend([
+                    f"Capture ID: {capture_id}",
+                    f"  Interface: {interface}",
+                    f"  Filter: {filter_str if filter_str else 'none'}",
+                    f"  Max Packets: {max_count}",
+                    f"  Status: {status}",
+                    ""
+                ])
+        else:
+            lines.append("No packet capture profiles found")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def packet_capture_status(status_data: Dict[str, Any]) -> str:
+        """Format packet capture status.
+
+        Args:
+            status_data: Packet capture status from FortiGate API
+
+        Returns:
+            Formatted packet capture status
+        """
+        lines = ["Packet Capture Status", ""]
+
+        if "results" in status_data:
+            results = status_data["results"]
+            if isinstance(results, list) and results:
+                results = results[0]
+
+            lines.extend([
+                f"Capture ID: {results.get('id', 'N/A')}",
+                f"State: {results.get('state', 'unknown')}",
+                f"Packets Captured: {results.get('packet-count', 0)}",
+                f"Bytes Captured: {results.get('byte-count', 0)}",
+                f"Interface: {results.get('interface', 'N/A')}",
+                f"Filter: {results.get('filter', 'none') or 'none'}",
+            ])
+
+            if results.get("start-time"):
+                lines.append(f"Start Time: {results['start-time']}")
+            if results.get("stop-time"):
+                lines.append(f"Stop Time: {results['stop-time']}")
+            if results.get("file-size"):
+                lines.append(f"File Size: {results['file-size']} bytes")
+        else:
+            lines.append("No status information available")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def packet_capture_download(download_data: Dict[str, Any]) -> str:
+        """Format packet capture download response.
+
+        Args:
+            download_data: Download data from FortiGate API
+
+        Returns:
+            Formatted download information
+        """
+        lines = ["Packet Capture Download", ""]
+
+        if "results" in download_data:
+            results = download_data["results"]
+            if isinstance(results, list) and results:
+                results = results[0]
+
+            if results.get("file") or results.get("data"):
+                lines.extend([
+                    "File Available: Yes",
+                    f"File Size: {results.get('size', 'Unknown')} bytes",
+                    "Format: PCAP",
+                    "",
+                    "Note: Capture data is available for download"
+                ])
+            else:
+                lines.append("No capture file available - capture may still be running or empty")
+        else:
+            lines.append("Download information not available")
+
         return "\n".join(lines)

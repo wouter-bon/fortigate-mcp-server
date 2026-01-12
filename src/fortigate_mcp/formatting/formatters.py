@@ -257,12 +257,12 @@ class FortiGateFormatters:
     @staticmethod
     def format_connection_test(device_id: str, success: bool, error: Optional[str] = None) -> List[Content]:
         """Format connection test result.
-        
+
         Args:
             device_id: Device identifier
             success: Whether connection test succeeded
             error: Error message if connection failed
-            
+
         Returns:
             List containing formatted Content object
         """
@@ -272,5 +272,44 @@ class FortiGateFormatters:
             formatted_text = f"❌ Connection test failed for device '{device_id}'"
             if error:
                 formatted_text += f"\nError: {error}"
-        
+
+        return [Content(type="text", text=formatted_text)]
+
+    @staticmethod
+    def format_packet_captures(captures_data: Dict[str, Any]) -> List[Content]:
+        """Format packet capture profiles list.
+
+        Args:
+            captures_data: Raw packet captures data from FortiGate API
+
+        Returns:
+            List containing formatted Content object
+        """
+        formatted_text = FortiGateTemplates.packet_captures(captures_data)
+        return [Content(type="text", text=formatted_text)]
+
+    @staticmethod
+    def format_packet_capture_status(status_data: Dict[str, Any]) -> List[Content]:
+        """Format packet capture status.
+
+        Args:
+            status_data: Raw packet capture status from FortiGate API
+
+        Returns:
+            List containing formatted Content object
+        """
+        formatted_text = FortiGateTemplates.packet_capture_status(status_data)
+        return [Content(type="text", text=formatted_text)]
+
+    @staticmethod
+    def format_packet_capture_download(download_data: Dict[str, Any]) -> List[Content]:
+        """Format packet capture download response.
+
+        Args:
+            download_data: Raw download data from FortiGate API
+
+        Returns:
+            List containing formatted Content object
+        """
+        formatted_text = FortiGateTemplates.packet_capture_download(download_data)
         return [Content(type="text", text=formatted_text)]

@@ -8,6 +8,7 @@ from .routing import RoutingTools
 from .virtual_ip import VirtualIPTools
 from .certificate import CertificateTools
 from .acme import ACMETools
+from .packet_capture import PacketCaptureTools
 
 __all__ = [
     "FortiGateTool",
@@ -17,5 +18,6 @@ __all__ = [
     "RoutingTools",
     "VirtualIPTools",
     "CertificateTools",
-    "ACMETools"
+    "ACMETools",
+    "PacketCaptureTools"
 ]

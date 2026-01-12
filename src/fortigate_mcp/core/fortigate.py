@@ -465,6 +465,150 @@ class FortiGateAPI:
         """
         return self._make_request("GET", "cmdb/system/ha", vdom=vdom)
 
+    # Packet Capture (Sniffer) endpoints
+    def get_packet_captures(self, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get list of all packet capture profiles.
+
+        Returns configured packet sniffer profiles with their settings.
+        """
+        return self._make_request("GET", "cmdb/system/sniffer", vdom=vdom)
+
+    def get_packet_capture(self, capture_id: int, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get a specific packet capture profile.
+
+        Args:
+            capture_id: Sniffer profile ID
+            vdom: Virtual domain
+
+        Returns:
+            Packet capture profile configuration
+        """
+        return self._make_request("GET", f"cmdb/system/sniffer/{capture_id}", vdom=vdom)
+
+    def create_packet_capture(
+        self,
+        interface: str,
+        filter_str: Optional[str] = None,
+        max_packet_count: int = 10000,
+        vdom: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create a packet capture profile.
+
+        Args:
+            interface: Interface to capture on (e.g., 'any', 'port1')
+            filter_str: BPF-style filter string
+            max_packet_count: Maximum packets to capture
+            vdom: Virtual domain
+
+        Returns:
+            API response with created capture profile
+        """
+        capture_data = {
+            "interface": interface,
+            "max-packet-count": max_packet_count,
+        }
+        if filter_str:
+            capture_data["filter"] = filter_str
+
+        return self._make_request("POST", "cmdb/system/sniffer", data=capture_data, vdom=vdom)
+
+    def delete_packet_capture(self, capture_id: int, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Delete a packet capture profile.
+
+        Args:
+            capture_id: Sniffer profile ID to delete
+            vdom: Virtual domain
+
+        Returns:
+            API response
+        """
+        return self._make_request("DELETE", f"cmdb/system/sniffer/{capture_id}", vdom=vdom)
+
+    def start_packet_capture(self, capture_id: int, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Start a packet capture.
+
+        Args:
+            capture_id: Sniffer profile ID to start
+            vdom: Virtual domain
+
+        Returns:
+            API response
+        """
+        return self._make_request(
+            "POST",
+            "monitor/system/sniffer/start",
+            params={"mkey": capture_id},
+            vdom=vdom
+        )
+
+    def stop_packet_capture(self, capture_id: int, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Stop a packet capture.
+
+        Args:
+            capture_id: Sniffer profile ID to stop
+            vdom: Virtual domain
+
+        Returns:
+            API response
+        """
+        return self._make_request(
+            "POST",
+            "monitor/system/sniffer/stop",
+            params={"mkey": capture_id},
+            vdom=vdom
+        )
+
+    def get_packet_capture_status(self, capture_id: int, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get packet capture status.
+
+        Args:
+            capture_id: Sniffer profile ID
+            vdom: Virtual domain
+
+        Returns:
+            Capture status including packet count, state, etc.
+        """
+        return self._make_request(
+            "GET",
+            "monitor/system/sniffer",
+            params={"mkey": capture_id},
+            vdom=vdom
+        )
+
+    def download_packet_capture(self, capture_id: int, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Download packet capture file.
+
+        Args:
+            capture_id: Sniffer profile ID
+            vdom: Virtual domain
+
+        Returns:
+            Capture file data or download information
+        """
+        return self._make_request(
+            "GET",
+            "monitor/system/sniffer/download",
+            params={"mkey": capture_id},
+            vdom=vdom
+        )
+
+    def clear_packet_capture(self, capture_id: int, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Clear captured packets from a capture profile.
+
+        Args:
+            capture_id: Sniffer profile ID
+            vdom: Virtual domain
+
+        Returns:
+            API response
+        """
+        return self._make_request(
+            "POST",
+            "monitor/system/sniffer/clear",
+            params={"mkey": capture_id},
+            vdom=vdom
+        )
+
 
 class FortiGateManager:
     """Manager for multiple FortiGate devices.
@@ -508,13 +652,19 @@ class FortiGateManager:
             raise ValueError(f"Device '{device_id}' not found")
         return self.devices[device_id]
     
-    def list_devices(self) -> List[str]:
-        """List all registered device IDs.
-        
+    def list_devices(self) -> Dict[str, Dict[str, Any]]:
+        """List all registered devices with their info.
+
         Returns:
-            List of device identifiers
+            Dict mapping device_id to device info (host, vdom)
         """
-        return list(self.devices.keys())
+        return {
+            device_id: {
+                "host": device.config.host,
+                "vdom": device.config.vdom
+            }
+            for device_id, device in self.devices.items()
+        }
     
     def add_device(self, device_id: str, host: str, port: int = 443,
                    username: Optional[str] = None, password: Optional[str] = None,
