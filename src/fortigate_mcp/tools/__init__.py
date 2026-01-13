@@ -9,6 +9,7 @@ from .virtual_ip import VirtualIPTools
 from .certificate import CertificateTools
 from .acme import ACMETools
 from .packet_capture import PacketCaptureTools
+from .ipsec import IPSecTools
 
 __all__ = [
     "FortiGateTool",
@@ -19,5 +20,6 @@ __all__ = [
     "VirtualIPTools",
     "CertificateTools",
     "ACMETools",
-    "PacketCaptureTools"
+    "PacketCaptureTools",
+    "IPSecTools"
 ]

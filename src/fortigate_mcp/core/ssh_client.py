@@ -331,6 +331,177 @@ class FortiGateSSHClient:
         finally:
             self.disconnect()
 
+    # IPSec VPN diagnostic commands
+    def get_ike_gateway_list(self, timeout: int = 30) -> str:
+        """Get IKE gateway list with negotiation details.
+
+        Command: diagnose vpn ike gateway list
+
+        Returns:
+            Raw CLI output showing IKE gateway status
+        """
+        return self.execute_command("diagnose vpn ike gateway list", timeout=timeout)
+
+    def get_tunnel_list(self, tunnel_name: Optional[str] = None, timeout: int = 30) -> str:
+        """Get IPSec tunnel list with traffic statistics.
+
+        Command: diagnose vpn tunnel list [name <tunnel>]
+
+        Args:
+            tunnel_name: Optional specific tunnel name to query
+            timeout: Command timeout
+
+        Returns:
+            Raw CLI output showing tunnel status and stats
+        """
+        if tunnel_name:
+            return self.execute_command(f"diagnose vpn tunnel list name {tunnel_name}", timeout=timeout)
+        return self.execute_command("diagnose vpn tunnel list", timeout=timeout)
+
+    def bring_tunnel_up(self, phase1_name: str, timeout: int = 30) -> str:
+        """Bring up an IPSec tunnel.
+
+        Command: diagnose vpn tunnel up <phase1_name>
+
+        Args:
+            phase1_name: Name of the Phase 1 interface/tunnel
+            timeout: Command timeout
+
+        Returns:
+            CLI output indicating tunnel initiation
+        """
+        self.logger.info(f"Bringing up tunnel: {phase1_name}")
+        return self.execute_command(f"diagnose vpn tunnel up {phase1_name}", timeout=timeout)
+
+    def bring_tunnel_down(self, phase1_name: str, timeout: int = 30) -> str:
+        """Bring down an IPSec tunnel.
+
+        Command: diagnose vpn tunnel down <phase1_name>
+
+        Args:
+            phase1_name: Name of the Phase 1 interface/tunnel
+            timeout: Command timeout
+
+        Returns:
+            CLI output indicating tunnel teardown
+        """
+        self.logger.info(f"Bringing down tunnel: {phase1_name}")
+        return self.execute_command(f"diagnose vpn tunnel down {phase1_name}", timeout=timeout)
+
+    def clear_ike_gateway(self, gateway_name: Optional[str] = None, timeout: int = 30) -> str:
+        """Clear IKE gateway to force renegotiation.
+
+        Command: diagnose vpn ike gateway clear [name <gateway>]
+
+        Args:
+            gateway_name: Optional specific gateway to clear (clears all if not specified)
+            timeout: Command timeout
+
+        Returns:
+            CLI output
+        """
+        if gateway_name:
+            self.logger.info(f"Clearing IKE gateway: {gateway_name}")
+            return self.execute_command(f"diagnose vpn ike gateway clear name {gateway_name}", timeout=timeout)
+        self.logger.info("Clearing all IKE gateways")
+        return self.execute_command("diagnose vpn ike gateway clear", timeout=timeout)
+
+    def parse_ike_gateway_list(self, output: str) -> Dict[str, Any]:
+        """Parse diagnose vpn ike gateway list output.
+
+        Args:
+            output: Raw CLI output from get_ike_gateway_list()
+
+        Returns:
+            Parsed gateway information
+        """
+        gateways = []
+        current_gateway = None
+
+        for line in output.split('\n'):
+            line = line.strip()
+
+            # Look for gateway name lines
+            name_match = re.match(r'^name:\s*(.+)$', line, re.IGNORECASE)
+            if name_match:
+                if current_gateway:
+                    gateways.append(current_gateway)
+                current_gateway = {"name": name_match.group(1).strip(), "raw_lines": []}
+
+            if current_gateway:
+                current_gateway["raw_lines"].append(line)
+
+                # Parse common fields
+                if ":" in line:
+                    key, _, value = line.partition(":")
+                    key = key.strip().lower().replace(" ", "_")
+                    value = value.strip()
+                    if key and value and key != "name":
+                        current_gateway[key] = value
+
+        if current_gateway:
+            gateways.append(current_gateway)
+
+        return {
+            "gateway_count": len(gateways),
+            "gateways": gateways
+        }
+
+    def parse_tunnel_list(self, output: str) -> Dict[str, Any]:
+        """Parse diagnose vpn tunnel list output.
+
+        Args:
+            output: Raw CLI output from get_tunnel_list()
+
+        Returns:
+            Parsed tunnel information with statistics
+        """
+        tunnels = []
+        current_tunnel = None
+
+        for line in output.split('\n'):
+            line = line.strip()
+
+            # Look for tunnel/gateway name indicators
+            name_match = re.match(r'^name:\s*(.+)$', line, re.IGNORECASE)
+            if name_match:
+                if current_tunnel:
+                    tunnels.append(current_tunnel)
+                current_tunnel = {
+                    "name": name_match.group(1).strip(),
+                    "raw_lines": [],
+                    "incoming_bytes": 0,
+                    "outgoing_bytes": 0
+                }
+
+            if current_tunnel:
+                current_tunnel["raw_lines"].append(line)
+
+                # Parse statistics
+                in_match = re.search(r'incoming\s*:\s*(\d+)', line, re.IGNORECASE)
+                if in_match:
+                    current_tunnel["incoming_bytes"] = int(in_match.group(1))
+
+                out_match = re.search(r'outgoing\s*:\s*(\d+)', line, re.IGNORECASE)
+                if out_match:
+                    current_tunnel["outgoing_bytes"] = int(out_match.group(1))
+
+                # Parse common key:value pairs
+                if ":" in line:
+                    key, _, value = line.partition(":")
+                    key = key.strip().lower().replace(" ", "_").replace("-", "_")
+                    value = value.strip()
+                    if key and value and key not in ["name", "incoming", "outgoing"]:
+                        current_tunnel[key] = value
+
+        if current_tunnel:
+            tunnels.append(current_tunnel)
+
+        return {
+            "tunnel_count": len(tunnels),
+            "tunnels": tunnels
+        }
+
 
 # Import socket for timeout exception
 import socket

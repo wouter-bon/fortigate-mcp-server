@@ -609,6 +609,148 @@ class FortiGateAPI:
             vdom=vdom
         )
 
+    # IPSec VPN Phase 1 endpoints
+    def get_ipsec_phase1_interfaces(self, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get all IPSec VPN Phase 1 interface configurations.
+
+        Returns:
+            List of Phase 1 tunnel configurations
+        """
+        return self._make_request("GET", "cmdb/vpn.ipsec/phase1-interface", vdom=vdom)
+
+    def get_ipsec_phase1_interface(self, name: str, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get a specific IPSec VPN Phase 1 interface configuration.
+
+        Args:
+            name: Phase 1 interface name
+            vdom: Virtual domain
+
+        Returns:
+            Phase 1 tunnel configuration
+        """
+        return self._make_request("GET", f"cmdb/vpn.ipsec/phase1-interface/{name}", vdom=vdom)
+
+    def create_ipsec_phase1_interface(self, phase1_data: Dict[str, Any], vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Create an IPSec VPN Phase 1 interface.
+
+        Args:
+            phase1_data: Phase 1 configuration data including:
+                - name: Tunnel name
+                - interface: Outgoing interface
+                - remote-gw: Remote gateway IP
+                - psksecret: Pre-shared key
+                - proposal: Phase 1 proposal (e.g., 'aes256-sha256')
+                - ike-version: IKE version (1 or 2)
+            vdom: Virtual domain
+
+        Returns:
+            API response with created tunnel
+        """
+        return self._make_request("POST", "cmdb/vpn.ipsec/phase1-interface", data=phase1_data, vdom=vdom)
+
+    def update_ipsec_phase1_interface(self, name: str, phase1_data: Dict[str, Any], vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Update an IPSec VPN Phase 1 interface.
+
+        Args:
+            name: Phase 1 interface name
+            phase1_data: Updated configuration data
+            vdom: Virtual domain
+
+        Returns:
+            API response
+        """
+        return self._make_request("PUT", f"cmdb/vpn.ipsec/phase1-interface/{name}", data=phase1_data, vdom=vdom)
+
+    def delete_ipsec_phase1_interface(self, name: str, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Delete an IPSec VPN Phase 1 interface.
+
+        Args:
+            name: Phase 1 interface name
+            vdom: Virtual domain
+
+        Returns:
+            API response
+        """
+        return self._make_request("DELETE", f"cmdb/vpn.ipsec/phase1-interface/{name}", vdom=vdom)
+
+    # IPSec VPN Phase 2 endpoints
+    def get_ipsec_phase2_interfaces(self, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get all IPSec VPN Phase 2 interface configurations.
+
+        Returns:
+            List of Phase 2 selector configurations
+        """
+        return self._make_request("GET", "cmdb/vpn.ipsec/phase2-interface", vdom=vdom)
+
+    def get_ipsec_phase2_interface(self, name: str, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get a specific IPSec VPN Phase 2 interface configuration.
+
+        Args:
+            name: Phase 2 interface name
+            vdom: Virtual domain
+
+        Returns:
+            Phase 2 selector configuration
+        """
+        return self._make_request("GET", f"cmdb/vpn.ipsec/phase2-interface/{name}", vdom=vdom)
+
+    def create_ipsec_phase2_interface(self, phase2_data: Dict[str, Any], vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Create an IPSec VPN Phase 2 interface.
+
+        Args:
+            phase2_data: Phase 2 configuration data including:
+                - name: Selector name
+                - phase1name: Associated Phase 1 tunnel
+                - src-subnet: Source subnet
+                - dst-subnet: Destination subnet
+                - proposal: Phase 2 proposal
+            vdom: Virtual domain
+
+        Returns:
+            API response with created selector
+        """
+        return self._make_request("POST", "cmdb/vpn.ipsec/phase2-interface", data=phase2_data, vdom=vdom)
+
+    def update_ipsec_phase2_interface(self, name: str, phase2_data: Dict[str, Any], vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Update an IPSec VPN Phase 2 interface.
+
+        Args:
+            name: Phase 2 interface name
+            phase2_data: Updated configuration data
+            vdom: Virtual domain
+
+        Returns:
+            API response
+        """
+        return self._make_request("PUT", f"cmdb/vpn.ipsec/phase2-interface/{name}", data=phase2_data, vdom=vdom)
+
+    def delete_ipsec_phase2_interface(self, name: str, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Delete an IPSec VPN Phase 2 interface.
+
+        Args:
+            name: Phase 2 interface name
+            vdom: Virtual domain
+
+        Returns:
+            API response
+        """
+        return self._make_request("DELETE", f"cmdb/vpn.ipsec/phase2-interface/{name}", vdom=vdom)
+
+    # IPSec VPN Monitor endpoints
+    def get_ipsec_tunnel_status(self, vdom: Optional[str] = None) -> Dict[str, Any]:
+        """Get IPSec tunnel runtime status.
+
+        Returns real-time status of all IPSec tunnels including:
+        - Connection state
+        - Traffic statistics
+        - Peer information
+        - Proxy IDs (Phase 2 selectors)
+
+        Returns:
+            Tunnel status information
+        """
+        return self._make_request("GET", "monitor/vpn/ipsec", vdom=vdom)
+
 
 class FortiGateManager:
     """Manager for multiple FortiGate devices.

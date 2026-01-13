@@ -37,6 +37,7 @@ from .tools.acme import ACMETools
 from .tools.fabric import FabricTools
 from .tools.fortimanager import FortiManagerTools
 from .tools.packet_capture import PacketCaptureTools
+from .tools.ipsec import IPSecTools
 
 logger = logging.getLogger("fortigate-mcp.http")
 
@@ -113,6 +114,7 @@ class FortiGateMCPHTTPServer:
         self.acme_tools = ACMETools(self.fortigate_manager, acme_config)
         self.fabric_tools = FabricTools(self.fortigate_manager)
         self.packet_capture_tools = PacketCaptureTools(self.fortigate_manager)
+        self.ipsec_tools = IPSecTools(self.fortigate_manager)
 
         # Initialize FortiManager
         self.fmg_manager = FortiManagerManager()
@@ -473,6 +475,82 @@ class FortiGateMCPHTTPServer:
                 duration_seconds, max_packet_count, verbose, vdom
             )
 
+        # IPSec VPN tools - Phase 1 Configuration
+        @self.mcp.tool(description="List IPSec VPN Phase 1 tunnel configurations")
+        def list_ipsec_phase1(device_id: str, vdom: Optional[str] = None):
+            return self.ipsec_tools.list_phase1_interfaces(device_id, vdom)
+
+        @self.mcp.tool(description="Get IPSec VPN Phase 1 tunnel detail")
+        def get_ipsec_phase1(device_id: str, name: str, vdom: Optional[str] = None):
+            return self.ipsec_tools.get_phase1_interface(device_id, name, vdom)
+
+        @self.mcp.tool(description="Create IPSec VPN Phase 1 tunnel")
+        def create_ipsec_phase1(device_id: str, phase1_data: dict, vdom: Optional[str] = None):
+            return self.ipsec_tools.create_phase1_interface(device_id, phase1_data, vdom)
+
+        @self.mcp.tool(description="Update IPSec VPN Phase 1 tunnel")
+        def update_ipsec_phase1(device_id: str, name: str, phase1_data: dict, vdom: Optional[str] = None):
+            return self.ipsec_tools.update_phase1_interface(device_id, name, phase1_data, vdom)
+
+        @self.mcp.tool(description="Delete IPSec VPN Phase 1 tunnel")
+        def delete_ipsec_phase1(device_id: str, name: str, vdom: Optional[str] = None):
+            return self.ipsec_tools.delete_phase1_interface(device_id, name, vdom)
+
+        # IPSec VPN tools - Phase 2 Configuration
+        @self.mcp.tool(description="List IPSec VPN Phase 2 selector configurations")
+        def list_ipsec_phase2(device_id: str, vdom: Optional[str] = None):
+            return self.ipsec_tools.list_phase2_interfaces(device_id, vdom)
+
+        @self.mcp.tool(description="Get IPSec VPN Phase 2 selector detail")
+        def get_ipsec_phase2(device_id: str, name: str, vdom: Optional[str] = None):
+            return self.ipsec_tools.get_phase2_interface(device_id, name, vdom)
+
+        @self.mcp.tool(description="Create IPSec VPN Phase 2 selector")
+        def create_ipsec_phase2(device_id: str, phase2_data: dict, vdom: Optional[str] = None):
+            return self.ipsec_tools.create_phase2_interface(device_id, phase2_data, vdom)
+
+        @self.mcp.tool(description="Update IPSec VPN Phase 2 selector")
+        def update_ipsec_phase2(device_id: str, name: str, phase2_data: dict, vdom: Optional[str] = None):
+            return self.ipsec_tools.update_phase2_interface(device_id, name, phase2_data, vdom)
+
+        @self.mcp.tool(description="Delete IPSec VPN Phase 2 selector")
+        def delete_ipsec_phase2(device_id: str, name: str, vdom: Optional[str] = None):
+            return self.ipsec_tools.delete_phase2_interface(device_id, name, vdom)
+
+        # IPSec VPN tools - Status and Diagnostics
+        @self.mcp.tool(description="Get IPSec tunnel runtime status and traffic stats")
+        def get_ipsec_tunnel_status(device_id: str, vdom: Optional[str] = None):
+            return self.ipsec_tools.get_tunnel_status(device_id, vdom)
+
+        @self.mcp.tool(description="Get IKE gateway list with negotiation details via SSH")
+        def diagnose_ipsec_ike_gateways(device_id: str):
+            return self.ipsec_tools.diagnose_ike_gateways(device_id)
+
+        @self.mcp.tool(description="Get IPSec tunnel list with traffic statistics via SSH")
+        def diagnose_ipsec_tunnels(device_id: str, tunnel_name: Optional[str] = None):
+            return self.ipsec_tools.diagnose_tunnels(device_id, tunnel_name)
+
+        @self.mcp.tool(description="Bring up an IPSec tunnel via SSH")
+        def ipsec_tunnel_up(device_id: str, phase1_name: str):
+            return self.ipsec_tools.tunnel_up(device_id, phase1_name)
+
+        @self.mcp.tool(description="Bring down an IPSec tunnel via SSH")
+        def ipsec_tunnel_down(device_id: str, phase1_name: str):
+            return self.ipsec_tools.tunnel_down(device_id, phase1_name)
+
+        @self.mcp.tool(description="Clear IKE gateway to force renegotiation via SSH")
+        def clear_ipsec_ike_gateway(device_id: str, gateway_name: Optional[str] = None):
+            return self.ipsec_tools.clear_ike_gateway(device_id, gateway_name)
+
+        # IPSec VPN tools - Troubleshooting
+        @self.mcp.tool(description="Comprehensive IPSec tunnel troubleshooting (config + status + diagnostics)")
+        def troubleshoot_ipsec_tunnel(device_id: str, tunnel_name: str, vdom: Optional[str] = None):
+            return self.ipsec_tools.troubleshoot_tunnel(device_id, tunnel_name, vdom)
+
+        @self.mcp.tool(description="Get complete IPSec VPN summary for a device")
+        def get_ipsec_vpn_summary(device_id: str, vdom: Optional[str] = None):
+            return self.ipsec_tools.get_vpn_summary(device_id, vdom)
+
         # FortiManager tools
         @self.mcp.tool(description="List registered FortiManager instances")
         def fmg_list_managers():
@@ -634,6 +712,7 @@ class FortiGateMCPHTTPServer:
                     "acme_tools": self.acme_tools.get_schema_info(),
                     "fabric_tools": self.fabric_tools.get_schema_info(),
                     "packet_capture_tools": self.packet_capture_tools.get_schema_info(),
+                    "ipsec_tools": self.ipsec_tools.get_schema_info(),
                     "fortimanager_tools": {
                         "name": "fortimanager_tools",
                         "description": "FortiManager centralized management tools",
