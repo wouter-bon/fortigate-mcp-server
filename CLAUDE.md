@@ -81,7 +81,7 @@ Tool categories map to FortiGate API endpoints:
 | `CertificateTools` | `cmdb/certificate/local`, `cmdb/certificate/ca`, `cmdb/certificate/remote`, `cmdb/certificate/crl` |
 | `FabricTools` | Security Fabric topology, HA cluster status, SDN connectors |
 | `ACMETools` | Let's Encrypt certificate automation via DNS-01 challenge |
-| `PacketCaptureTools` | `cmdb/system/sniffer`, `monitor/system/sniffer` - packet capture with tshark analysis |
+| `PacketCaptureTools` | SSH-based `diagnose sniffer packet` CLI command for packet capture |
 | `FortiManagerTools` | Central device/policy management (uses `FortiManagerTool` base class) |
 
 ### Device Name Resolution
@@ -148,15 +148,39 @@ Monitor paths for packet capture:
 
 All requests include `?vdom={vdom}` query parameter.
 
-## Packet Capture
+## Packet Capture (SSH-based)
 
-The `capture_and_analyze` tool provides automated traffic capture with analysis:
-1. Creates capture profile with BPF-style filters (interface, src_ip, dst_ip, protocol, port)
-2. Runs capture for configurable duration (default: 2 minutes)
-3. Saves PCAP to temp file (e.g., `/tmp/fortigate_capture_1_xxx.pcap`)
-4. Analyzes with tshark if available (protocol hierarchy, IP/TCP conversations, endpoints)
-5. Falls back to basic PCAP header parsing if tshark not installed
-6. Cleans up capture profile after completion
+The `capture_and_analyze` tool uses SSH to run the FortiGate CLI command `diagnose sniffer packet`:
+
+**Why SSH?** The REST API packet capture endpoints (`monitor/system/sniffer`) are not available on all FortiGate versions. SSH provides reliable access across all versions.
+
+**How it works:**
+1. Connects to FortiGate via SSH using device credentials (username/password required)
+2. Executes `diagnose sniffer packet <interface> '<filter>' <verbose> <count> <timestamp>`
+3. Captures output for configurable duration (default: 2 minutes)
+4. Saves raw sniffer output to temp file (e.g., `/tmp/fortigate_sniffer_default_xxx.txt`)
+5. Parses output to extract unique IPs, protocols, and packet statistics
+
+**Configuration:**
+- Device config must include `username` and `password` for SSH access
+- Optional `ssh_port` in device config (default: 22)
+- Requires `paramiko` package: `pip install paramiko`
+
+**Verbosity levels:**
+- 1 = packet headers
+- 2 = headers + IP data
+- 3 = headers + Ethernet data
+- 4 = headers with interface name (default)
+- 5 = headers + IP data with interface name
+- 6 = headers + Ethernet data with interface name
+
+**BPF-style filters supported:**
+- `host <ip>` - match source or destination IP
+- `src host <ip>` - match source IP
+- `dst host <ip>` - match destination IP
+- `port <port>` - match source or destination port
+- `tcp`, `udp`, `icmp` - protocol filters
+- Multiple filters combined with "and"
 
 ## MCP Protocol Notes
 

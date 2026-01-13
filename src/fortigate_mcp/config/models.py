@@ -18,12 +18,13 @@ from pydantic import BaseModel, Field
 
 class FortiGateDeviceConfig(BaseModel):
     """Model for individual FortiGate device configuration.
-    
+
     Defines the required and optional parameters for
     connecting to a specific FortiGate device.
     """
     host: str = Field(description="FortiGate IP address or hostname")
     port: int = Field(default=443, description="HTTPS port (default: 443)")
+    ssh_port: int = Field(default=22, description="SSH port for CLI access (default: 22)")
     username: Optional[str] = Field(default=None, description="Username for authentication")
     password: Optional[str] = Field(default=None, description="Password for authentication")
     api_token: Optional[str] = Field(default=None, description="API token for authentication")

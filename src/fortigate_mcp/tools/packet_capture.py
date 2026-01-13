@@ -7,7 +7,11 @@ This module provides MCP tools for packet capture operations:
 - Monitor capture status
 - Download captured packets
 - Clear capture data
-- Timed capture with automatic analysis
+- Timed capture with automatic analysis via SSH
+
+Note: The capture_and_analyze tool uses SSH to run the 'diagnose sniffer packet'
+CLI command, as the packet capture REST API endpoints are not available on all
+FortiGate versions.
 """
 import base64
 import os
@@ -19,6 +23,7 @@ from typing import Dict, Any, List, Optional
 from mcp.types import TextContent as Content
 from .base import FortiGateTool
 from ..core.fortigate import FortiGateAPIError
+from ..core.ssh_client import FortiGateSSHClient, FortiGateSSHError, PARAMIKO_AVAILABLE
 
 
 class PacketCaptureTools(FortiGateTool):
@@ -26,7 +31,44 @@ class PacketCaptureTools(FortiGateTool):
 
     Provides packet capture (sniffer) functionality for network traffic
     analysis on FortiGate devices, including Security Fabric members.
+
+    The capture_and_analyze method uses SSH to execute the CLI 'diagnose sniffer packet'
+    command, which provides more reliable access to packet capture functionality
+    than the REST API on most FortiGate versions.
     """
+
+    def _get_ssh_client(self, device_id: str) -> FortiGateSSHClient:
+        """Create SSH client for a device.
+
+        Args:
+            device_id: Device identifier
+
+        Returns:
+            FortiGateSSHClient instance
+
+        Raises:
+            ValueError: If SSH is not available or credentials missing
+        """
+        if not PARAMIKO_AVAILABLE:
+            raise ValueError("SSH capture requires paramiko. Install with: pip install paramiko")
+
+        api_client = self._get_device_api(device_id)
+        config = api_client.config
+
+        if not config.username or not config.password:
+            raise ValueError(f"Device {device_id} requires username/password for SSH access")
+
+        ssh_port = getattr(config, 'ssh_port', 22)
+
+        return FortiGateSSHClient(
+            device_id=device_id,
+            host=config.host,
+            port=ssh_port,
+            username=config.username,
+            password=config.password,
+            timeout=config.timeout,
+            vdom=config.vdom
+        )
 
     def _build_filter_string(
         self,
@@ -478,19 +520,14 @@ class PacketCaptureTools(FortiGateTool):
         port: Optional[int] = None,
         duration_seconds: int = 120,
         max_packet_count: int = 10000,
-        cleanup: bool = True,
+        verbose: int = 4,
         vdom: Optional[str] = None
     ) -> List[Content]:
-        """Capture traffic for a specified duration, then analyze the results.
+        """Capture traffic for a specified duration using SSH, then analyze the results.
 
-        This is a convenience method that:
-        1. Creates a packet capture profile with the specified filters
-        2. Starts the capture
-        3. Waits for the specified duration (default: 2 minutes)
-        4. Stops the capture
-        5. Downloads and saves the capture to a temporary file
-        6. Analyzes the capture using tshark (if available) or basic analysis
-        7. Optionally cleans up the capture profile
+        This method uses SSH to run the 'diagnose sniffer packet' CLI command,
+        which provides reliable packet capture on all FortiGate versions. The output
+        is captured and analyzed to provide traffic statistics.
 
         Args:
             device_id: Target device identifier or name
@@ -501,169 +538,161 @@ class PacketCaptureTools(FortiGateTool):
             protocol: Protocol filter (tcp, udp, icmp)
             port: Port number filter
             duration_seconds: Capture duration in seconds (default: 120 = 2 minutes)
-            max_packet_count: Maximum packets to capture (default: 10000)
-            cleanup: Delete capture profile after analysis (default: True)
-            vdom: Virtual Domain (optional)
+            max_packet_count: Maximum packets to capture (0 = unlimited, default: 10000)
+            verbose: Verbosity level 1-6 (default: 4 = headers with interface name)
+                1 = print header of packets
+                2 = print header and data from IP of packets
+                3 = print header and data from Ethernet of packets
+                4 = print header of packets with interface name
+                5 = print header and data from IP of packets with interface name
+                6 = print header and data from Ethernet of packets with interface name
+            vdom: Virtual Domain (optional, uses device default)
 
         Returns:
             List of Content objects with capture analysis results
         """
-        capture_id = None
-        pcap_path = None
+        ssh_client = None
 
         try:
             resolved_device_id = self._validate_device_exists(device_id)
-            api_client = self._get_device_api(device_id)
 
             # Build filter string
             filter_str = self._build_filter_string(host, src_ip, dst_ip, protocol, port)
 
-            # Step 1: Create capture profile
-            self.logger.info(f"Creating packet capture on {device_id}, interface={interface}, filter='{filter_str}'")
-            create_result = api_client.create_packet_capture(
+            self.logger.info(f"Starting SSH packet capture on {device_id}")
+            self.logger.info(f"Interface: {interface}, Filter: '{filter_str or 'none'}'")
+            self.logger.info(f"Duration: {duration_seconds}s, Max packets: {max_packet_count}")
+
+            # Create SSH client
+            ssh_client = self._get_ssh_client(device_id)
+
+            # Run the sniffer via SSH
+            raw_output, stats = ssh_client.run_sniffer(
                 interface=interface,
-                filter_str=filter_str if filter_str else None,
-                max_packet_count=max_packet_count,
-                vdom=vdom
+                filter_str=filter_str,
+                verbose=verbose,
+                count=max_packet_count,
+                duration_seconds=duration_seconds,
+                timestamp_format="a"
             )
-            capture_id = create_result.get("mkey")
-            if not capture_id:
-                raise ValueError("Failed to create capture profile - no capture ID returned")
 
-            self.logger.info(f"Created capture profile with ID: {capture_id}")
+            # Save raw output to temp file for reference
+            output_path = None
+            with tempfile.NamedTemporaryFile(
+                mode='w',
+                suffix='.txt',
+                prefix=f'fortigate_sniffer_{resolved_device_id}_',
+                delete=False
+            ) as f:
+                f.write(raw_output)
+                output_path = f.name
 
-            # Step 2: Start capture
-            self.logger.info(f"Starting packet capture {capture_id}")
-            api_client.start_packet_capture(capture_id, vdom)
+            self.logger.info(f"Saved sniffer output to: {output_path}")
 
-            # Step 3: Wait for specified duration
-            self.logger.info(f"Capturing for {duration_seconds} seconds...")
-            start_time = time.time()
-            elapsed = 0
-
-            while elapsed < duration_seconds:
-                time.sleep(min(10, duration_seconds - elapsed))  # Check every 10 seconds
-                elapsed = time.time() - start_time
-
-                # Check status periodically
-                try:
-                    status = api_client.get_packet_capture_status(capture_id, vdom)
-                    results = status.get("results", {})
-                    if isinstance(results, list) and results:
-                        results = results[0]
-                    packet_count = results.get("packet-count", 0)
-                    state = results.get("state", "unknown")
-                    self.logger.info(f"Capture status: {state}, packets: {packet_count}, elapsed: {int(elapsed)}s")
-
-                    # Stop early if max packets reached
-                    if packet_count >= max_packet_count:
-                        self.logger.info(f"Max packet count ({max_packet_count}) reached, stopping early")
-                        break
-                except Exception as e:
-                    self.logger.warning(f"Could not get capture status: {e}")
-
-            # Step 4: Stop capture
-            self.logger.info(f"Stopping packet capture {capture_id}")
-            api_client.stop_packet_capture(capture_id, vdom)
-
-            # Give it a moment to finalize
-            time.sleep(2)
-
-            # Step 5: Get final status
-            final_status = api_client.get_packet_capture_status(capture_id, vdom)
-            status_results = final_status.get("results", {})
-            if isinstance(status_results, list) and status_results:
-                status_results = status_results[0]
-
-            final_packet_count = status_results.get("packet-count", 0)
-            final_byte_count = status_results.get("byte-count", 0)
-
-            # Step 6: Download capture
-            self.logger.info(f"Downloading capture data...")
-            download_result = api_client.download_packet_capture(capture_id, vdom)
-
-            # Extract PCAP data
-            pcap_data = None
-            download_results = download_result.get("results", {})
-            if isinstance(download_results, list) and download_results:
-                download_results = download_results[0]
-
-            if download_results.get("data"):
-                # Base64 encoded data
-                try:
-                    pcap_data = base64.b64decode(download_results["data"])
-                except Exception as e:
-                    self.logger.warning(f"Failed to decode base64 data: {e}")
-            elif download_results.get("file"):
-                # File content directly
-                pcap_data = download_results["file"]
-                if isinstance(pcap_data, str):
-                    pcap_data = pcap_data.encode()
-
-            # Step 7: Save to temp file and analyze
+            # Build analysis results
             analysis_results = {
                 "capture_summary": {
                     "device_id": resolved_device_id,
-                    "capture_id": capture_id,
-                    "interface": interface,
-                    "filter": filter_str or "none",
-                    "duration_seconds": int(time.time() - start_time),
-                    "packets_captured": final_packet_count,
-                    "bytes_captured": final_byte_count,
+                    "method": "SSH (diagnose sniffer packet)",
+                    "interface": stats.get("interface", interface),
+                    "filter": stats.get("filter", filter_str or "none"),
+                    "duration_seconds": stats.get("duration_seconds", duration_seconds),
+                    "packets_captured": stats.get("packets_captured", 0),
+                    "verbose_level": verbose,
                     "timestamp": datetime.now().isoformat()
                 },
-                "analysis": {},
-                "pcap_file": None
+                "analysis": {
+                    "tool": "ssh_sniffer",
+                    "unique_ips": stats.get("unique_ips", []),
+                    "protocols": stats.get("protocols", {}),
+                    "raw_output_lines": len(raw_output.splitlines()),
+                },
+                "output_file": output_path
             }
 
-            if pcap_data and len(pcap_data) > 0:
-                # Save to temp file
-                with tempfile.NamedTemporaryFile(
-                    mode='wb',
-                    suffix='.pcap',
-                    prefix=f'fortigate_capture_{capture_id}_',
-                    delete=False
-                ) as f:
-                    f.write(pcap_data)
-                    pcap_path = f.name
-
-                analysis_results["pcap_file"] = pcap_path
-                self.logger.info(f"Saved capture to: {pcap_path}")
-
-                # Try tshark analysis first
-                tshark_analysis = self._analyze_pcap_with_tshark(pcap_path)
-                if tshark_analysis["available"]:
-                    analysis_results["analysis"] = tshark_analysis
-                else:
-                    # Fall back to basic analysis
-                    analysis_results["analysis"] = self._analyze_pcap_basic(pcap_data)
-                    analysis_results["analysis"]["note"] = "tshark not available, using basic analysis"
-            else:
-                analysis_results["analysis"]["error"] = "No capture data available - capture may be empty"
-
-            # Step 8: Cleanup if requested
-            if cleanup and capture_id:
-                try:
-                    self.logger.info(f"Cleaning up capture profile {capture_id}")
-                    api_client.delete_packet_capture(capture_id, vdom)
-                    analysis_results["capture_summary"]["cleaned_up"] = True
-                except Exception as e:
-                    self.logger.warning(f"Failed to cleanup capture profile: {e}")
-                    analysis_results["capture_summary"]["cleaned_up"] = False
-
             # Format output
-            return self._format_capture_analysis(analysis_results)
+            return self._format_ssh_capture_analysis(analysis_results, raw_output)
 
+        except FortiGateSSHError as e:
+            return self._handle_error("SSH packet capture", device_id, e)
         except Exception as e:
-            # Attempt cleanup on error
-            if capture_id and cleanup:
+            return self._handle_error("capture and analyze", device_id, e)
+        finally:
+            if ssh_client:
                 try:
-                    api_client = self._get_device_api(device_id)
-                    api_client.stop_packet_capture(capture_id, vdom)
-                    api_client.delete_packet_capture(capture_id, vdom)
+                    ssh_client.disconnect()
                 except Exception:
                     pass
-            return self._handle_error("capture and analyze", device_id, e)
+
+    def _format_ssh_capture_analysis(self, results: Dict[str, Any], raw_output: str) -> List[Content]:
+        """Format SSH-based capture analysis results for display.
+
+        Args:
+            results: Analysis results dictionary
+            raw_output: Raw sniffer output from SSH
+
+        Returns:
+            List of Content objects with formatted analysis
+        """
+        lines = ["Packet Capture Analysis (SSH)", "=" * 50, ""]
+
+        # Capture summary
+        summary = results.get("capture_summary", {})
+        lines.extend([
+            "Capture Summary:",
+            f"  Device: {summary.get('device_id', 'N/A')}",
+            f"  Method: {summary.get('method', 'SSH')}",
+            f"  Interface: {summary.get('interface', 'N/A')}",
+            f"  Filter: {summary.get('filter', 'none')}",
+            f"  Duration: {summary.get('duration_seconds', 0)} seconds",
+            f"  Packets Captured: {summary.get('packets_captured', 0)}",
+            f"  Verbose Level: {summary.get('verbose_level', 4)}",
+            f"  Timestamp: {summary.get('timestamp', 'N/A')}",
+            ""
+        ])
+
+        if results.get("output_file"):
+            lines.extend([
+                f"Output File: {results['output_file']}",
+                ""
+            ])
+
+        # Analysis results
+        analysis = results.get("analysis", {})
+
+        if analysis.get("unique_ips"):
+            lines.extend([
+                "Unique IP Addresses:",
+                *[f"  - {ip}" for ip in analysis["unique_ips"][:20]],  # Limit to 20
+            ])
+            if len(analysis["unique_ips"]) > 20:
+                lines.append(f"  ... and {len(analysis['unique_ips']) - 20} more")
+            lines.append("")
+
+        if analysis.get("protocols"):
+            lines.extend([
+                "Protocol Summary:",
+                *[f"  - {proto}: {count}" for proto, count in analysis["protocols"].items()],
+                ""
+            ])
+
+        lines.append(f"Raw output: {analysis.get('raw_output_lines', 0)} lines")
+        lines.append("")
+
+        # Show sample of raw output (first 50 lines)
+        output_lines = raw_output.splitlines()
+        if output_lines:
+            lines.extend([
+                "Sample Output (first 50 lines):",
+                "-" * 40,
+            ])
+            for line in output_lines[:50]:
+                if line.strip():
+                    lines.append(line)
+            if len(output_lines) > 50:
+                lines.append(f"... ({len(output_lines) - 50} more lines)")
+
+        return [Content(type="text", text="\n".join(lines))]
 
     def _format_capture_analysis(self, results: Dict[str, Any]) -> List[Content]:
         """Format capture analysis results for display.
@@ -859,7 +888,7 @@ class PacketCaptureTools(FortiGateTool):
                 },
                 {
                     "name": "capture_and_analyze",
-                    "description": "Capture traffic for a duration and analyze results",
+                    "description": "Capture traffic via SSH using 'diagnose sniffer packet' CLI command",
                     "parameters": [
                         {"name": "device_id", "type": "string", "required": True},
                         {"name": "interface", "type": "string", "required": False, "default": "any"},
@@ -870,7 +899,7 @@ class PacketCaptureTools(FortiGateTool):
                         {"name": "port", "type": "integer", "required": False},
                         {"name": "duration_seconds", "type": "integer", "required": False, "default": 120},
                         {"name": "max_packet_count", "type": "integer", "required": False, "default": 10000},
-                        {"name": "cleanup", "type": "boolean", "required": False, "default": True},
+                        {"name": "verbose", "type": "integer", "required": False, "default": 4},
                         {"name": "vdom", "type": "string", "required": False}
                     ]
                 }

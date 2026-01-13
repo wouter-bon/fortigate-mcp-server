@@ -454,7 +454,7 @@ class FortiGateMCPHTTPServer:
         def clear_packet_capture(device_id: str, capture_id: int, vdom: Optional[str] = None):
             return self.packet_capture_tools.clear_packet_capture(device_id, capture_id, vdom)
 
-        @self.mcp.tool(description="Capture traffic for a specified duration (default 2 min), save to file, and analyze with tshark")
+        @self.mcp.tool(description="Capture traffic via SSH using 'diagnose sniffer packet' for specified duration (default 2 min)")
         def capture_and_analyze(
             device_id: str,
             interface: str = "any",
@@ -465,12 +465,12 @@ class FortiGateMCPHTTPServer:
             port: Optional[int] = None,
             duration_seconds: int = 120,
             max_packet_count: int = 10000,
-            cleanup: bool = True,
+            verbose: int = 4,
             vdom: Optional[str] = None
         ):
             return self.packet_capture_tools.capture_and_analyze(
                 device_id, interface, host, src_ip, dst_ip, protocol, port,
-                duration_seconds, max_packet_count, cleanup, vdom
+                duration_seconds, max_packet_count, verbose, vdom
             )
 
         # FortiManager tools
