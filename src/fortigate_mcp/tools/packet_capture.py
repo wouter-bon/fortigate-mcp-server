@@ -93,7 +93,11 @@ class PacketCaptureTools(FortiGateTool):
         filter_parts = []
 
         if host:
-            filter_parts.append(f"host {host}")
+            # Use "net" for CIDR notation (subnets), "host" for single IPs
+            if "/" in host:
+                filter_parts.append(f"net {host}")
+            else:
+                filter_parts.append(f"host {host}")
         if src_ip:
             filter_parts.append(f"src host {src_ip}")
         if dst_ip:
