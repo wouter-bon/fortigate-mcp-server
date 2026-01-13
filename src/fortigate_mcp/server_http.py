@@ -27,6 +27,7 @@ from .config.loader import load_config
 from .core.logging import setup_logging
 from .core.fortigate import FortiGateManager
 from .core.fortimanager import FortiManagerManager
+from .core.fortianalyzer import FortiAnalyzerManager
 from .tools.device import DeviceTools
 from .tools.firewall import FirewallTools
 from .tools.network import NetworkTools
@@ -36,6 +37,7 @@ from .tools.certificate import CertificateTools
 from .tools.acme import ACMETools
 from .tools.fabric import FabricTools
 from .tools.fortimanager import FortiManagerTools
+from .tools.fortianalyzer import FortiAnalyzerTools
 from .tools.packet_capture import PacketCaptureTools
 from .tools.ipsec import IPSecTools
 
@@ -119,6 +121,10 @@ class FortiGateMCPHTTPServer:
         # Initialize FortiManager
         self.fmg_manager = FortiManagerManager()
         self.fmg_tools = FortiManagerTools(self.fmg_manager)
+
+        # Initialize FortiAnalyzer
+        self.faz_manager = FortiAnalyzerManager()
+        self.faz_tools = FortiAnalyzerTools(self.faz_manager)
 
         # Initialize FastMCP
         self.mcp = FastMCP("FortiGateMCP-HTTP")
@@ -636,6 +642,200 @@ class FortiGateMCPHTTPServer:
         @self.mcp.tool(description="Get task status from FortiManager")
         def fmg_get_task_status(manager_id: str, task_id: int):
             return self.fmg_tools.get_task_status(manager_id, task_id)
+
+        # FortiAnalyzer tools
+        @self.mcp.tool(description="List registered FortiAnalyzer instances")
+        def faz_list_analyzers():
+            return self.faz_tools.list_analyzers()
+
+        @self.mcp.tool(description="Add a FortiAnalyzer instance")
+        def faz_add_analyzer(
+            analyzer_id: str,
+            host: str,
+            api_token: Optional[str] = None,
+            username: Optional[str] = None,
+            password: Optional[str] = None,
+            port: int = 443,
+            verify_ssl: bool = False,
+            adom: str = "root"
+        ):
+            return self.faz_tools.add_analyzer(
+                analyzer_id, host, api_token, username, password, port, verify_ssl, adom
+            )
+
+        @self.mcp.tool(description="Remove a FortiAnalyzer instance")
+        def faz_remove_analyzer(analyzer_id: str):
+            return self.faz_tools.remove_analyzer(analyzer_id)
+
+        @self.mcp.tool(description="Test FortiAnalyzer connection")
+        def faz_test_connection(analyzer_id: str):
+            return self.faz_tools.test_connection(analyzer_id)
+
+        @self.mcp.tool(description="Get FortiAnalyzer system status")
+        def faz_get_system_status(analyzer_id: str):
+            return self.faz_tools.get_system_status(analyzer_id)
+
+        @self.mcp.tool(description="Get FortiAnalyzer Administrative Domains (ADOMs)")
+        def faz_get_adoms(analyzer_id: str):
+            return self.faz_tools.get_adoms(analyzer_id)
+
+        @self.mcp.tool(description="Get devices reporting logs to FortiAnalyzer")
+        def faz_get_devices(analyzer_id: str, adom: Optional[str] = None):
+            return self.faz_tools.get_devices(analyzer_id, adom)
+
+        @self.mcp.tool(description="Get device log status from FortiAnalyzer")
+        def faz_get_device_status(analyzer_id: str, device_name: str, adom: Optional[str] = None):
+            return self.faz_tools.get_device_status(analyzer_id, device_name, adom)
+
+        @self.mcp.tool(description="Search logs with filters (traffic, event, security, etc.)")
+        def faz_search_logs(
+            analyzer_id: str,
+            log_type: str = "traffic",
+            filter_expr: Optional[str] = None,
+            time_range: Optional[str] = None,
+            limit: int = 100,
+            device: Optional[str] = None,
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.search_logs(
+                analyzer_id, log_type, filter_expr, time_range, limit, device, adom
+            )
+
+        @self.mcp.tool(description="Get log statistics and volume metrics")
+        def faz_get_log_stats(
+            analyzer_id: str,
+            time_range: Optional[str] = None,
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.get_log_stats(analyzer_id, time_range, adom)
+
+        @self.mcp.tool(description="Get available log fields for a log type")
+        def faz_get_log_fields(
+            analyzer_id: str,
+            log_type: str = "traffic",
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.get_log_fields(analyzer_id, log_type, adom)
+
+        @self.mcp.tool(description="Get raw log data for a time range")
+        def faz_get_raw_logs(
+            analyzer_id: str,
+            log_type: str = "traffic",
+            time_range: Optional[str] = None,
+            limit: int = 100,
+            device: Optional[str] = None,
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.get_raw_logs(
+                analyzer_id, log_type, time_range, limit, device, adom
+            )
+
+        @self.mcp.tool(description="List available report templates")
+        def faz_list_reports(analyzer_id: str, adom: Optional[str] = None):
+            return self.faz_tools.list_reports(analyzer_id, adom)
+
+        @self.mcp.tool(description="Run a report with specified parameters")
+        def faz_run_report(
+            analyzer_id: str,
+            report_name: str,
+            time_range: Optional[str] = None,
+            devices: Optional[str] = None,
+            output_format: str = "pdf",
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.run_report(
+                analyzer_id, report_name, time_range, devices, output_format, adom
+            )
+
+        @self.mcp.tool(description="Get report execution status")
+        def faz_get_report_status(
+            analyzer_id: str,
+            task_id: int,
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.get_report_status(analyzer_id, task_id, adom)
+
+        @self.mcp.tool(description="Download completed report")
+        def faz_download_report(
+            analyzer_id: str,
+            task_id: int,
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.download_report(analyzer_id, task_id, adom)
+
+        @self.mcp.tool(description="Get FortiView dashboard data")
+        def faz_get_fortiview(
+            analyzer_id: str,
+            view_type: str,
+            time_range: Optional[str] = None,
+            filter_expr: Optional[str] = None,
+            limit: int = 20,
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.get_fortiview(
+                analyzer_id, view_type, time_range, filter_expr, limit, adom
+            )
+
+        @self.mcp.tool(description="Get threat statistics and trends")
+        def faz_get_threat_stats(
+            analyzer_id: str,
+            time_range: Optional[str] = None,
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.get_threat_stats(analyzer_id, time_range, adom)
+
+        @self.mcp.tool(description="Get top traffic sources")
+        def faz_get_top_sources(
+            analyzer_id: str,
+            time_range: Optional[str] = None,
+            limit: int = 20,
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.get_top_sources(analyzer_id, time_range, limit, adom)
+
+        @self.mcp.tool(description="Get top traffic destinations")
+        def faz_get_top_destinations(
+            analyzer_id: str,
+            time_range: Optional[str] = None,
+            limit: int = 20,
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.get_top_destinations(analyzer_id, time_range, limit, adom)
+
+        @self.mcp.tool(description="Get top applications by traffic")
+        def faz_get_top_applications(
+            analyzer_id: str,
+            time_range: Optional[str] = None,
+            limit: int = 20,
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.get_top_applications(analyzer_id, time_range, limit, adom)
+
+        @self.mcp.tool(description="Get event summary and counts")
+        def faz_get_event_summary(
+            analyzer_id: str,
+            time_range: Optional[str] = None,
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.get_event_summary(analyzer_id, time_range, adom)
+
+        @self.mcp.tool(description="List active alerts")
+        def faz_list_alerts(
+            analyzer_id: str,
+            severity: Optional[str] = None,
+            status: Optional[str] = None,
+            limit: int = 100,
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.list_alerts(analyzer_id, severity, status, limit, adom)
+
+        @self.mcp.tool(description="Acknowledge an alert")
+        def faz_acknowledge_alert(
+            analyzer_id: str,
+            alert_id: str,
+            adom: Optional[str] = None
+        ):
+            return self.faz_tools.acknowledge_alert(analyzer_id, alert_id, adom)
 
         # System tools
         @self.mcp.tool(description="Test FortiGate connection")

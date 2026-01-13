@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-FortiGate MCP Server is a Model Context Protocol (MCP) server for managing FortiGate firewall devices and FortiManager. It exposes FortiGate/FortiManager REST API operations as MCP tools for integration with AI assistants and automation systems like Cursor IDE.
+FortiGate MCP Server is a Model Context Protocol (MCP) server for managing FortiGate firewall devices, FortiManager, and FortiAnalyzer. It exposes FortiGate/FortiManager/FortiAnalyzer REST API operations as MCP tools for integration with AI assistants and automation systems like Cursor IDE.
 
 ## Common Commands
 
@@ -50,17 +50,20 @@ Two server implementations share the same tool infrastructure:
 Both instantiate `FortiGateMCPServer`/`FortiGateMCPHTTPServer` which:
 1. Loads config via `config/loader.py` → validates with Pydantic models in `config/models.py`
 2. Creates `FortiGateManager` with configured devices
-3. Optionally creates `FortiManagerManager` for FortiManager integration
-4. Instantiates tool classes (`DeviceTools`, `FirewallTools`, etc.)
-5. Registers MCP tools via `@self.mcp.tool()` decorators
+3. Creates `FortiManagerManager` for FortiManager integration (dynamic registration)
+4. Creates `FortiAnalyzerManager` for FortiAnalyzer integration (dynamic registration)
+5. Instantiates tool classes (`DeviceTools`, `FirewallTools`, `FortiAnalyzerTools`, etc.)
+6. Registers MCP tools via `@self.mcp.tool()` decorators
 
 ### Core Layer (`core/`)
 - `FortiGateManager` - Multi-device manager, maintains dict of `FortiGateAPI` instances by device_id
 - `FortiGateAPI` - Single device client, wraps all FortiGate REST API calls via `_make_request()`
-- `FortiManagerManager` / `FortiManagerAPI` - FortiManager client for central management
+- `FortiManagerManager` / `FortiManagerAPI` - FortiManager JSON-RPC client for central management
+- `FortiAnalyzerManager` / `FortiAnalyzerAPI` - FortiAnalyzer JSON-RPC client for log/analytics
 - `ACMEClient` - Let's Encrypt certificate management via ACME protocol
 - `CloudflareDNS` - DNS-01 challenge handler for ACME via Cloudflare API
-- API base URL pattern: `https://{host}:{port}/api/v2/{endpoint}`
+- FortiGate API base URL pattern: `https://{host}:{port}/api/v2/{endpoint}`
+- FortiManager/FortiAnalyzer API base URL: `https://{host}:{port}/jsonrpc`
 - Auth: Bearer token (`api_token`) or Basic auth (`username/password`)
 
 ### Tools Layer (`tools/`)
@@ -83,6 +86,7 @@ Tool categories map to FortiGate API endpoints:
 | `ACMETools` | Let's Encrypt certificate automation via DNS-01 challenge |
 | `PacketCaptureTools` | SSH-based `diagnose sniffer packet` CLI command for packet capture |
 | `FortiManagerTools` | Central device/policy management (uses `FortiManagerTool` base class) |
+| `FortiAnalyzerTools` | Log search, reports, FortiView analytics, alerts (uses `FortiAnalyzerTool` base class) |
 
 ### Device Name Resolution
 The base class supports device name aliases via `DEVICE_NAME_MAP` in `tools/base.py`. Users can reference devices by friendly name (e.g., "NLFMFW1A") instead of device_id (e.g., "default"). Resolution is case-insensitive.
@@ -114,6 +118,7 @@ Root model: `Config` in `config/models.py` containing:
 - HTTP server tests device connections on startup via `_test_initial_connection()`
 - Tool descriptions in `tools/definitions.py` are used for MCP tool registration
 - FortiManager tools use separate `FortiManagerTool` base class with `FortiManagerManager`
+- FortiAnalyzer tools use separate `FortiAnalyzerTool` base class with `FortiAnalyzerManager`
 
 ## FortiGate REST API Reference
 
@@ -181,6 +186,99 @@ The `capture_and_analyze` tool uses SSH to run the FortiGate CLI command `diagno
 - `port <port>` - match source or destination port
 - `tcp`, `udp`, `icmp` - protocol filters
 - Multiple filters combined with "and"
+
+## FortiAnalyzer Integration
+
+FortiAnalyzer uses the same JSON-RPC API pattern as FortiManager. Instances are registered dynamically at runtime (not via config file).
+
+### Dynamic Registration
+
+```python
+# Register a FortiAnalyzer instance via MCP tool
+faz_add_analyzer(
+    analyzer_id="faz1",
+    host="192.168.1.100",
+    api_token="your-api-token",  # or username/password
+    adom="root"
+)
+```
+
+### FortiAnalyzer API Endpoints
+
+All requests go to `https://{host}:{port}/jsonrpc` using JSON-RPC protocol.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/sys/login/user` | Session authentication |
+| `/sys/logout` | End session |
+| `/sys/status` | System status |
+| `/dvmdb/adom` | List ADOMs |
+| `/dvmdb/adom/{adom}/device` | Devices reporting logs |
+| `/logview/adom/{adom}/logsearch` | Search logs |
+| `/logview/adom/{adom}/logstats` | Log statistics |
+| `/logview/adom/{adom}/logfields/{type}` | Available log fields |
+| `/report/adom/{adom}/config/report` | Report templates |
+| `/report/adom/{adom}/run` | Execute report |
+| `/fortiview/adom/{adom}/{view}/run` | FortiView analytics |
+| `/eventmgmt/adom/{adom}/alerts` | Alert management |
+
+### FortiAnalyzer Tools (24 tools)
+
+**Analyzer Management:**
+- `faz_list_analyzers` - List registered instances
+- `faz_add_analyzer` - Add new instance
+- `faz_remove_analyzer` - Remove instance
+- `faz_test_connection` - Test connectivity
+
+**System Information:**
+- `faz_get_system_status` - System status
+- `faz_get_adoms` - List ADOMs
+
+**Device Management:**
+- `faz_get_devices` - Devices reporting logs
+- `faz_get_device_status` - Device log status
+
+**Log Operations:**
+- `faz_search_logs` - Search with filters (traffic, event, security)
+- `faz_get_log_stats` - Log volume statistics
+- `faz_get_log_fields` - Available fields per log type
+- `faz_get_raw_logs` - Raw log data
+
+**Report Operations:**
+- `faz_list_reports` - Report templates
+- `faz_run_report` - Execute report (async)
+- `faz_get_report_status` - Check report progress
+- `faz_download_report` - Download completed report
+
+**FortiView Analytics:**
+- `faz_get_fortiview` - Dashboard data
+- `faz_get_threat_stats` - Threat statistics
+- `faz_get_top_sources` - Top traffic sources
+- `faz_get_top_destinations` - Top destinations
+- `faz_get_top_applications` - Top applications
+
+**Event Management:**
+- `faz_get_event_summary` - Event counts
+- `faz_list_alerts` - Active alerts
+- `faz_acknowledge_alert` - Acknowledge alert
+
+### Time Range Syntax
+
+Log/analytics tools support flexible time ranges:
+- Relative: `"1h"`, `"24h"`, `"7d"`, `"30d"`
+- Keywords: `"today"`, `"yesterday"`
+- Default: last 1 hour
+
+### Log Types
+
+Supported log types for search operations:
+- `traffic` - Traffic logs (default)
+- `event` - System event logs
+- `security` - Security logs (IPS, AV, Web Filter)
+- `app-ctrl` - Application control
+- `webfilter` - Web filtering
+- `ips` - Intrusion prevention
+- `virus` - Antivirus
 
 ## MCP Protocol Notes
 

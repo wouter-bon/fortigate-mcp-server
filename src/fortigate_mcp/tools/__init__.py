@@ -10,6 +10,7 @@ from .certificate import CertificateTools
 from .acme import ACMETools
 from .packet_capture import PacketCaptureTools
 from .ipsec import IPSecTools
+from .fortianalyzer import FortiAnalyzerTool, FortiAnalyzerTools
 
 __all__ = [
     "FortiGateTool",
@@ -21,5 +22,7 @@ __all__ = [
     "CertificateTools",
     "ACMETools",
     "PacketCaptureTools",
-    "IPSecTools"
+    "IPSecTools",
+    "FortiAnalyzerTool",
+    "FortiAnalyzerTools",
 ]
